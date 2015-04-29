@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+<head>
+  <title>new (Parallel::ForkManager)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre><span class="ruby-comment cmt"># File lib/parallel/forkmanager.rb, line 344</span>
+    <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">initialize</span>(<span class="ruby-identifier">max_procs</span> = <span class="ruby-value">0</span>, <span class="ruby-identifier">params</span> = {}, <span class="ruby-identifier">debug</span> = <span class="ruby-value">0</span>)
+        <span class="ruby-ivar">@max_procs</span> = <span class="ruby-identifier">max_procs</span>
+        <span class="ruby-ivar">@debug</span> = <span class="ruby-identifier">debug</span> <span class="ruby-comment cmt"># Set debug to 1 for debugging messages.</span>
+        <span class="ruby-ivar">@params</span> = <span class="ruby-identifier">params</span>
+        <span class="ruby-ivar">@processes</span> = {}
+        <span class="ruby-ivar">@do_on_finish</span> = {}
+        <span class="ruby-ivar">@in_child</span> = <span class="ruby-keyword kw">false</span>
+        <span class="ruby-ivar">@has_block</span> = <span class="ruby-keyword kw">false</span>
+        <span class="ruby-ivar">@on_wait_period</span> = <span class="ruby-keyword kw">nil</span>
+        <span class="ruby-ivar">@parent_pid</span> = <span class="ruby-identifier">$$</span>
+        <span class="ruby-ivar">@tempdir</span> = <span class="ruby-ivar">@params</span>[<span class="ruby-value str">'tempdir'</span>] <span class="ruby-operator">||</span> <span class="ruby-constant">Dir</span>.<span class="ruby-identifier">tmpdir</span>()
+        <span class="ruby-ivar">@do_serialize</span> = <span class="ruby-value">0</span>
+        <span class="ruby-ivar">@serialize_as</span> = <span class="ruby-keyword kw">nil</span>
+        <span class="ruby-ivar">@data_structure</span> = <span class="ruby-keyword kw">nil</span>
+
+        <span class="ruby-comment cmt"># Make sure that @tempdir has a trailing slash.</span>
+        <span class="ruby-ivar">@tempdir</span> <span class="ruby-operator">&lt;&lt;=</span> (<span class="ruby-ivar">@tempdir</span>[(<span class="ruby-ivar">@tempdir</span>.<span class="ruby-identifier">length</span><span class="ruby-operator">-</span><span class="ruby-value">1</span>)<span class="ruby-operator">..</span><span class="ruby-value">-1</span>] <span class="ruby-operator">!=</span> <span class="ruby-value str">&quot;/&quot;</span>) <span class="ruby-operator">?</span> <span class="ruby-value str">&quot;/&quot;</span> <span class="ruby-operator">:</span> <span class="ruby-value str">&quot;&quot;</span>
+        
+        <span class="ruby-comment cmt"># Always provide debug information if our max processes are zero!        </span>
+        <span class="ruby-keyword kw">if</span> <span class="ruby-ivar">@max_procs</span>.<span class="ruby-identifier">zero?</span>
+            <span class="ruby-identifier">print</span> <span class="ruby-value str">&quot;Zero processes have been specified so we will not fork and will proceed in debug mode!\n&quot;</span>
+            <span class="ruby-ivar">@debug</span> = <span class="ruby-value">1</span>
+        <span class="ruby-keyword kw">end</span>
+        
+        <span class="ruby-keyword kw">if</span> <span class="ruby-ivar">@debug</span> <span class="ruby-operator">==</span> <span class="ruby-value">1</span>
+            <span class="ruby-identifier">print</span> <span class="ruby-node">&quot;in initialize #{max_procs}!\n&quot;</span>
+            <span class="ruby-identifier">print</span> <span class="ruby-node">&quot;Will use tempdir #{@tempdir}\n&quot;</span>
+        <span class="ruby-keyword kw">end</span>
+        
+        <span class="ruby-keyword kw">if</span> <span class="ruby-ivar">@params</span>.<span class="ruby-identifier">keys</span>.<span class="ruby-identifier">length</span> <span class="ruby-operator">&gt;</span> <span class="ruby-value">0</span>
+            <span class="ruby-keyword kw">if</span> <span class="ruby-operator">!</span><span class="ruby-keyword kw">defined?</span> <span class="ruby-identifier">params</span>[<span class="ruby-value str">'tempdir'</span>]
+                <span class="ruby-identifier">print</span> <span class="ruby-value str">&quot;params missing required argument: tempdir!&quot;</span>
+                <span class="ruby-identifier">exit</span> <span class="ruby-value">1</span>
+            <span class="ruby-keyword kw">end</span>
+            
+            <span class="ruby-keyword kw">if</span> <span class="ruby-operator">!</span> <span class="ruby-constant">File</span>.<span class="ruby-identifier">directory?</span> <span class="ruby-ivar">@params</span>[<span class="ruby-value str">'tempdir'</span>]
+                <span class="ruby-identifier">print</span> <span class="ruby-node">&quot;Temporary directory #{@params['tempdir']} doesn't exist or is not a directory.\n&quot;</span>
+                <span class="ruby-identifier">exit</span> <span class="ruby-value">1</span>
+            <span class="ruby-keyword kw">end</span>
+            <span class="ruby-ivar">@tempdir</span> = <span class="ruby-ivar">@params</span>[<span class="ruby-value str">'tempdir'</span>]
+            <span class="ruby-ivar">@do_serialize</span> = <span class="ruby-value">1</span>
+
+            <span class="ruby-comment cmt">#</span>
+            <span class="ruby-comment cmt"># As of version 2.0, Marshal is the only way to serialize data that</span>
+            <span class="ruby-comment cmt"># we support.  YAML and others will likely be supported in later</span>
+            <span class="ruby-comment cmt"># versions.</span>
+            <span class="ruby-comment cmt">#</span>
+            <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">params</span>.<span class="ruby-identifier">has_key?</span> <span class="ruby-value str">&quot;serialize_as&quot;</span> <span class="ruby-keyword kw">or</span> <span class="ruby-identifier">params</span>.<span class="ruby-identifier">has_key?</span> <span class="ruby-value str">&quot;serialize_type&quot;</span>
+                <span class="ruby-ivar">@serialize_as</span> = (<span class="ruby-identifier">params</span>.<span class="ruby-identifier">has_key?</span> <span class="ruby-value str">&quot;serialize_as&quot;</span>) <span class="ruby-operator">?</span> <span class="ruby-identifier">params</span>[<span class="ruby-value str">'serialize_as'</span>] <span class="ruby-operator">:</span> <span class="ruby-identifier">params</span>[<span class="ruby-value str">'serialize_type'</span>]
+            <span class="ruby-keyword kw">else</span>
+                <span class="ruby-ivar">@serialize_as</span> = <span class="ruby-value str">'marshal'</span>
+            <span class="ruby-keyword kw">end</span>
+        <span class="ruby-keyword kw">else</span>
+            <span class="ruby-ivar">@serialize_as</span> = <span class="ruby-value str">'marshal'</span>
+        <span class="ruby-keyword kw">end</span>
+    <span class="ruby-keyword kw">end</span></pre>
+</body>
+</html>

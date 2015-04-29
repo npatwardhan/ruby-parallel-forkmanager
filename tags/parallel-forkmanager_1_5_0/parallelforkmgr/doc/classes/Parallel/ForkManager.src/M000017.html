@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+<head>
+  <title>_NT_waitpid (Parallel::ForkManager)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre><span class="ruby-comment cmt"># File lib/parallel/forkmanager.rb, line 926</span>
+    <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">_NT_waitpid</span>(<span class="ruby-identifier">pid</span>, <span class="ruby-identifier">par</span>)
+        <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">par</span> <span class="ruby-operator">==</span> <span class="ruby-constant">Process</span><span class="ruby-operator">::</span><span class="ruby-constant">WNOHANG</span>
+            <span class="ruby-identifier">pids</span> = <span class="ruby-ivar">@processes</span>.<span class="ruby-identifier">keys</span>()
+            <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">pids</span>.<span class="ruby-identifier">length</span>() <span class="ruby-operator">==</span> <span class="ruby-value">0</span>
+                <span class="ruby-keyword kw">return</span> <span class="ruby-value">-1</span>
+            <span class="ruby-keyword kw">end</span>
+            
+            <span class="ruby-identifier">kid</span> = <span class="ruby-value">0</span>
+            <span class="ruby-keyword kw">for</span> <span class="ruby-identifier">my_pid</span> <span class="ruby-keyword kw">in</span> <span class="ruby-identifier">pids</span>
+                <span class="ruby-identifier">kid</span> = <span class="ruby-identifier">waitpid</span>(<span class="ruby-identifier">my_pid</span>, <span class="ruby-identifier">par</span>)
+                <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">kid</span> <span class="ruby-operator">!=</span> <span class="ruby-value">0</span>
+                    <span class="ruby-keyword kw">return</span> <span class="ruby-identifier">kid</span>
+                <span class="ruby-keyword kw">end</span>
+            <span class="ruby-keyword kw">return</span> <span class="ruby-identifier">kid</span>
+            <span class="ruby-keyword kw">end</span>
+        <span class="ruby-keyword kw">else</span>
+            <span class="ruby-keyword kw">return</span> <span class="ruby-identifier">waitpid</span>(<span class="ruby-identifier">pid</span>, <span class="ruby-identifier">par</span>)    
+        <span class="ruby-keyword kw">end</span>
+    <span class="ruby-keyword kw">end</span></pre>
+</body>
+</html>

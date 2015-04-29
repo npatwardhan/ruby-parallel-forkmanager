@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+<head>
+  <title>wait_one_child (Parallel::ForkManager)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre><span class="ruby-comment cmt"># File lib/parallel/forkmanager.rb, line 318</span>
+    <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">wait_one_child</span>(<span class="ruby-identifier">par</span>)
+        <span class="ruby-identifier">params</span> = <span class="ruby-identifier">par</span> <span class="ruby-operator">||</span> <span class="ruby-value">0</span>
+
+        <span class="ruby-identifier">kid</span> = <span class="ruby-keyword kw">nil</span>
+        <span class="ruby-keyword kw">while</span> <span class="ruby-keyword kw">true</span>
+            <span class="ruby-comment cmt"># Call _NT_waitpid(...) if we're using a Windows or Java variant.</span>
+            <span class="ruby-keyword kw">if</span>(<span class="ruby-constant">RUBY_PLATFORM</span> <span class="ruby-operator">=~</span> <span class="ruby-regexp re">/mswin|mingw|bccwin|wince|emx|java/</span>)
+                <span class="ruby-identifier">kid</span> = <span class="ruby-identifier">_NT_waitpid</span>(<span class="ruby-value">-1</span>, <span class="ruby-identifier">params</span>)
+            <span class="ruby-keyword kw">else</span>
+                <span class="ruby-identifier">kid</span> = <span class="ruby-identifier">_waitpid</span>(<span class="ruby-value">-1</span>, <span class="ruby-identifier">params</span>)
+            <span class="ruby-keyword kw">end</span>
+
+            <span class="ruby-keyword kw">break</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">kid</span> <span class="ruby-operator">==</span> <span class="ruby-keyword kw">nil</span> <span class="ruby-keyword kw">or</span> <span class="ruby-identifier">kid</span> <span class="ruby-operator">==</span> <span class="ruby-value">-1</span> <span class="ruby-comment cmt"># Win32 returns negative PIDs</span>
+
+            <span class="ruby-keyword kw">redo</span> <span class="ruby-keyword kw">if</span> <span class="ruby-operator">!</span> <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">processes</span>.<span class="ruby-identifier">has_key?</span>(<span class="ruby-identifier">kid</span>)
+            <span class="ruby-identifier">id</span> = <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">processes</span>.<span class="ruby-identifier">delete</span>(<span class="ruby-identifier">kid</span>)
+            <span class="ruby-identifier">on_finish</span>(<span class="ruby-identifier">kid</span>, <span class="ruby-identifier">$?</span> <span class="ruby-operator">&gt;&gt;</span> <span class="ruby-value">8</span>, <span class="ruby-identifier">id</span>, <span class="ruby-identifier">$?</span> <span class="ruby-operator">&amp;</span> <span class="ruby-value">0x7f</span>, <span class="ruby-identifier">$?</span> <span class="ruby-operator">&amp;</span> <span class="ruby-value">0x80</span> <span class="ruby-operator">?</span> <span class="ruby-value">1</span> <span class="ruby-operator">:</span> <span class="ruby-value">0</span>)
+            <span class="ruby-keyword kw">break</span>
+        <span class="ruby-keyword kw">end</span>
+
+        <span class="ruby-identifier">kid</span> <span class="ruby-operator">||=</span> <span class="ruby-value">0</span>
+        <span class="ruby-identifier">kid</span>
+    <span class="ruby-keyword kw">end</span></pre>
+</body>
+</html>

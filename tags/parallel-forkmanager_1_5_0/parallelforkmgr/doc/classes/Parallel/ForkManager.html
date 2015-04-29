@@ -1,0 +1,832 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Class: Parallel::ForkManager</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href="../.././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+    
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+  
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }</style>" )
+  
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+
+    <div id="classHeader">
+        <table class="header-table">
+        <tr class="top-aligned-row">
+          <td><strong>Class</strong></td>
+          <td class="class-name-in-header">Parallel::ForkManager</td>
+        </tr>
+        <tr class="top-aligned-row">
+            <td><strong>In:</strong></td>
+            <td>
+                <a href="../../files/lib/parallel/forkmanager_rb.html">
+                lib/parallel/forkmanager.rb
+                </a>
+        <br />
+            </td>
+        </tr>
+
+        <tr class="top-aligned-row">
+            <td><strong>Parent:</strong></td>
+            <td>
+                Object
+            </td>
+        </tr>
+        </table>
+    </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+
+
+  <div id="contextContent">
+
+
+
+   </div>
+
+    <div id="method-list">
+      <h3 class="section-bar">Methods</h3>
+
+      <div class="name-list">
+      <a href="#M000017">_NT_waitpid</a>&nbsp;&nbsp;
+      <a href="#M000018">_serialize_data</a>&nbsp;&nbsp;
+      <a href="#M000019">_unserialize_data</a>&nbsp;&nbsp;
+      <a href="#M000016">_waitpid</a>&nbsp;&nbsp;
+      <a href="#M000003">finish</a>&nbsp;&nbsp;
+      <a href="#M000001">new</a>&nbsp;&nbsp;
+      <a href="#M000010">on_finish</a>&nbsp;&nbsp;
+      <a href="#M000014">on_start</a>&nbsp;&nbsp;
+      <a href="#M000012">on_wait</a>&nbsp;&nbsp;
+      <a href="#M000009">run_on_finish</a>&nbsp;&nbsp;
+      <a href="#M000013">run_on_start</a>&nbsp;&nbsp;
+      <a href="#M000011">run_on_wait</a>&nbsp;&nbsp;
+      <a href="#M000015">set_max_procs</a>&nbsp;&nbsp;
+      <a href="#M000002">start</a>&nbsp;&nbsp;
+      <a href="#M000007">wait_all_children</a>&nbsp;&nbsp;
+      <a href="#M000008">wait_all_childs</a>&nbsp;&nbsp;
+      <a href="#M000004">wait_children</a>&nbsp;&nbsp;
+      <a href="#M000005">wait_childs</a>&nbsp;&nbsp;
+      <a href="#M000006">wait_one_child</a>&nbsp;&nbsp;
+      </div>
+    </div>
+
+  </div>
+
+
+    <!-- if includes -->
+
+    <div id="section">
+
+
+    <div id="constants-list">
+      <h3 class="section-bar">Constants</h3>
+
+      <div class="name-list">
+        <table summary="Constants">
+        <tr class="top-aligned-row context-row">
+          <td class="context-item-name">VERSION</td>
+          <td>=</td>
+          <td class="context-item-value">'1.5.0'</td>
+        </tr>
+        </table>
+      </div>
+    </div>
+
+
+
+      
+
+
+    <!-- if method_list -->
+    <div id="methods">
+      <h3 class="section-bar">Public Class methods</h3>
+
+      <div id="method-M000001" class="method-detail">
+        <a name="M000001"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000001.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000001.html');return false;">
+          <span class="method-name">new</span><span class="method-args">(max_procs = 0, params = {}, debug = 0)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000001">new</a>(max_procs, [params, debug])
+</p>
+<p>
+Instantiate a <a href="ForkManager.html">Parallel::ForkManager</a> object.
+You must specify the maximum number of children to fork off. If you specify
+0 (zero), then no children will be forked and debugging output will be
+enabled.
+</p>
+<p>
+The optional second parameter, debug, is used to set debugging behavior for
+<a href="ForkManager.html">Parallel::ForkManager</a>. Default value for
+debug is 0 (off).
+</p>
+<p>
+The optional third parameter, params, is only used if you want to customize
+the behavior that children will use to send back some data (see Retrieving
+Data Structures below) to the parent. The following values are currently
+accepted for params (and their meanings):
+</p>
+<ul>
+<li>params[&#8216;tempdir&#8217;] represents the location of the temporary
+directory where serialized data structures will be stored.
+
+</li>
+<li>params[&#8216;serialize_as&#8217;] represents how the data will be
+serialized (NOTE: currently unimplemented in <a
+href="ForkManager.html">Parallel::ForkManager</a> 1.5.0).
+
+</li>
+</ul>
+<p>
+If params has not been provided, the following values are set:
+</p>
+<ul>
+<li>@tempdir is set to Dir.tmpdir() (likely defaults to /tmp).
+
+</li>
+<li>@serialize_as is set to &#8216;marshal&#8217;.
+
+</li>
+</ul>
+<p>
+NOTE NOTE NOTE: If you set tempdir to a directory that doe not exist, <a
+href="ForkManager.html">Parallel::ForkManager</a> will <em>not</em> create
+this directory for you and <a href="ForkManager.html#M000001">new</a>()
+will exit!
+</p>
+        </div>
+      </div>
+
+      <h3 class="section-bar">Public Instance methods</h3>
+
+      <div id="method-M000003" class="method-detail">
+        <a name="M000003"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000003.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000003.html');return false;">
+          <span class="method-name">finish</span><span class="method-args">(exit_code = 0, data_structure = nil)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000003">finish</a>(exit_code, [data_structure])
+&#8212; exit_code is optional
+</p>
+<p>
+<a href="ForkManager.html#M000003">finish</a>() loses the child process by
+exiting and accepts an optional exit code. Default exit code is 0 and can
+be retrieved in the parent via callback. If you&#8216;re running the
+program in debug mode (max_proc == 0), this method doesn&#8216;t do
+anything.
+</p>
+<p>
+If <em>data_structure</em> is provided, then <em>data structure</em> is
+serialized and passed to the parent process. See <em>Retrieving Data
+Structures</em> in the next section for more info. For example:
+</p>
+<pre>
+   %w{Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry}.each {
+       |person|
+       # pm.start(...) here
+
+       # ... etc ...
+
+       # Pass along data structure to finish().
+       pm.finish(0, {'person' =&gt; person})
+   }
+</pre>
+<h3>Retrieving Data Structures</h3>
+<p>
+The ability for the parent to retrieve data structures from child processes
+was adapted to <a href="ForkManager.html">Parallel::ForkManager</a> 1.5.0
+from Perl <a href="ForkManager.html">Parallel::ForkManager</a>. This
+functionality was originally introduced in Perl <a
+href="ForkManager.html">Parallel::ForkManager</a> 0.7.6.
+</p>
+<p>
+Each child process may optionally send 1 data structure back to the parent.
+By data structure, we mean a a string, hash, or array. The contents of the
+data structure are written out to temporary files on disk using the Marshal
+dump() method. This data structure is then retrieved from within the code
+you send to the <a href="ForkManager.html#M000009">run_on_finish</a>
+callback.
+</p>
+<p>
+NOTE NOTE NOTE: Only serialization with Marshal is supported at this time.
+Future versions of <a href="ForkManager.html">Parallel::ForkManager</a>
+<em>may</em> support expanded functionality!
+</p>
+<p>
+There are 2 steps involved in retrieving data structures:
+</p>
+<ol>
+<li>The data structure the child wishes to send back to the parent is provided
+as the second argument to the <a
+href="ForkManager.html#M000003">finish</a>() call. It is up to the child to
+decide whether or not to send anything back to the parent.
+
+</li>
+<li>The data structure is retrieved using the callback provided in the <a
+href="ForkManager.html#M000009">run_on_finish</a>() method.
+
+</li>
+</ol>
+<p>
+Data structure retrieval is <em>not</em> the same as returning a data
+structure from a method call! The data structure referenced by a given
+child process is serialized and written out to a file by <em>Marshal</em>.
+The file is subseqently read back into memory and a <a
+href="ForkManager.html#M000001">new</a> data structure that belongs to the
+parent process is created. Therefore it is recommended that you keep the
+returned structure small in size to mitigate any possible performance
+penalties.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000009" class="method-detail">
+        <a name="M000009"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000009.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000009.html');return false;">
+          <span class="method-name">run_on_finish</span><span class="method-args">(code=nil, pid=0, &amp;my_block)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+You can define <a
+href="ForkManager.html#M000009">run_on_finish</a>(&#8230;) that is called
+when a child in the parent process when a child is terminated.
+</p>
+<p>
+The parameters of <a
+href="ForkManager.html#M000009">run_on_finish</a>(&#8230;) are:
+</p>
+<ul>
+<li>pid of the process, which is terminated
+
+</li>
+<li>exit code of the program
+
+</li>
+<li>identification of the process (if provided in the &quot;<a
+href="ForkManager.html#M000002">start</a>&quot; method)
+
+</li>
+<li>exit signal (0-127: signal name)
+
+</li>
+<li>core dump (1 if there was core dump at exit)
+
+</li>
+<li>data structure or nil (see Retrieving Data Structures)
+
+</li>
+</ul>
+<p>
+<em>NOTE NOTE NOTE: Passing Proc to <a
+href="ForkManager.html#M000009">run_on_finish</a> will be deprecated in <a
+href="ForkManager.html">Parallel::ForkManager</a> 1.5! Please use the form
+shown below now!</em>
+</p>
+<p>
+As of <a href="ForkManager.html">Parallel::ForkManager</a> 1.2.0 <a
+href="ForkManager.html#M000009">run_on_finish</a> supports a block argument
+instead of needing to pass in a Proc explicitly.
+</p>
+<p>
+Example:
+</p>
+<pre>
+  pm.run_on_finish {
+          |pid,exit_code,ident|
+          print &quot;** PID (#{pid}) for #{ident} exited with code #{exit_code}!\n&quot;
+  }
+</pre>
+        </div>
+      </div>
+
+      <div id="method-M000013" class="method-detail">
+        <a name="M000013"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000013.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000013.html');return false;">
+          <span class="method-name">run_on_start</span><span class="method-args">(code=nil, &amp;block)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+You can define a subroutine which is called when a child is started. It is
+called after a successful startup of a child in the parent process.
+</p>
+<p>
+The parameters of code are as follows:
+</p>
+<ul>
+<li>pid of the process which has been started
+
+</li>
+<li>identification of the process (if provided in the &quot;<a
+href="ForkManager.html#M000002">start</a>&quot; method)
+
+</li>
+</ul>
+<p>
+<em>NOTE NOTE NOTE: Passing Proc to <a
+href="ForkManager.html#M000013">run_on_start</a> has been deprecated as of
+<a href="ForkManager.html">Parallel::ForkManager</a> 1.5! Please use the
+form shown below now!</em>
+</p>
+<p>
+As of <a href="ForkManager.html">Parallel::ForkManager</a> 1.2.0 <a
+href="ForkManager.html#M000013">run_on_start</a> supports a block argument
+instead of needing to pass in a Proc explicitly.
+</p>
+<p>
+Example:
+</p>
+<pre>
+  pm.run_on_start() {
+          |pid,ident|
+          print &quot;run on start ::: #{ident} (#{pid})\n&quot;
+      }
+</pre>
+<p>
+Note that code and block are mutually exclusive arguments. If you try to
+use pass both a Proc and a block to <a
+href="ForkManager.html#M000013">run_on_start</a> it will raise an error.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000011" class="method-detail">
+        <a name="M000011"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000011.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000011.html');return false;">
+          <span class="method-name">run_on_wait</span><span class="method-args">(*params, &amp;block)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+You can define a subroutine which is called when the child process needs to
+wait for the startup. If period is not defined, then one call is done per
+child. If period is defined, then code is called periodically and the
+method waits for &quot;period&quot; seconds betwen the two calls. Note,
+period can be fractional number also. The exact &quot;period seconds&quot;
+is not guaranteed, signals can shorten and the process scheduler can make
+it longer (i.e. on busy systems).
+</p>
+<p>
+No parameters are passed to code on the call.
+</p>
+<p>
+Example:
+</p>
+<p>
+<em>NOTE NOTE NOTE: Passing Proc to <a
+href="ForkManager.html#M000011">run_on_wait</a> will be deprecated in <a
+href="ForkManager.html">Parallel::ForkManager</a> 1.5! Please use the form
+shown below now!</em>
+</p>
+<p>
+As of <a href="ForkManager.html">Parallel::ForkManager</a> 1.2.0 <a
+href="ForkManager.html#M000011">run_on_wait</a> supports a block argument
+instead of needing to pass in a Proc explicitly.
+</p>
+<p>
+Example:
+</p>
+<pre>
+  period = 0.5
+  pm.run_on_wait(period) {
+          print &quot;** Have to wait for one child ...\n&quot;
+  }
+</pre>
+        </div>
+      </div>
+
+      <div id="method-M000015" class="method-detail">
+        <a name="M000015"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000015.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000015.html');return false;">
+          <span class="method-name">set_max_procs</span><span class="method-args">(mp=nil)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000015">set_max_procs</a>(mp) &#8212; mp is an
+integer
+</p>
+<p>
+<a href="ForkManager.html#M000015">set_max_procs</a>() allows you to set a
+<a href="ForkManager.html#M000001">new</a> maximum number of children to
+maintain.
+</p>
+<p>
+Return: The previous setting of max_procs.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000002" class="method-detail">
+        <a name="M000002"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000002.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000002.html');return false;">
+          <span class="method-name">start</span><span class="method-args">(identification=nil, *args, &amp;run_block)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000002">start</a>(&quot;string&quot;) &#8212;
+&quot;string&quot; identification is optional.
+</p>
+<p>
+<a href="ForkManager.html#M000002">start</a>(&quot;string&quot;) &quot;puts
+the fork in <a href="ForkManager.html">Parallel::ForkManager</a>&quot;
+&#8212; as <a href="ForkManager.html#M000002">start</a>() does the fork().
+</p>
+<p>
+<a href="ForkManager.html#M000002">start</a>(&quot;string&quot;) takes an
+optional &quot;string&quot; argument to use as a process identifier. It is
+used by the &quot;<a
+href="ForkManager.html#M000009">run_on_finish</a>&quot; callback for
+identifying the finished process. See <a
+href="ForkManager.html#M000009">run_on_finish</a>() for more information.
+For example:
+</p>
+<pre>
+  my_ident = &quot;webwacker-1.0&quot;
+  pm.start(my_ident)
+</pre>
+<p>
+<a href="ForkManager.html#M000002">start</a>(&quot;string&quot;) { block }
+takes an optional block parameter that tells the <a
+href="ForkManager.html">ForkManager</a> to follow Ruby fork() semantics for
+blocks. For example:
+</p>
+<pre>
+  my_ident = &quot;webwacker-1.0&quot;
+  pm.start(my_ident) {
+      print &quot;As easy as &quot;
+      [1,2,3].each {
+          |i|
+          print i, &quot;... &quot;
+      }
+  }
+</pre>
+<p>
+<a href="ForkManager.html#M000002">start</a>(&quot;string&quot;, arg1,
+arg2, &#8230; , argN) { block } requires a block parameter that tells the
+<a href="ForkManager.html">ForkManager</a> to follow Ruby fork() semantics
+for blocks. Like <a
+href="ForkManager.html#M000002">start</a>(&quot;string&quot;),
+&quot;string&quot; is an optional argument to use as a process identifier
+and is used by the &quot;<a
+href="ForkManager.html#M000009">run_on_finish</a>&quot; callback for
+identifying the finished process. For example:
+</p>
+<pre>
+  my_ident = &quot;webwacker-1.0&quot;
+  pm.start(my_ident, 1, 2, 3) {
+      |*my_args|
+      unless my_args.empty?
+          print &quot;As easy as &quot;
+          my_args.each {
+              |i|
+              print i, &quot;... &quot;
+          }
+      end
+  }
+</pre>
+<p>
+<em>NOTE NOTE NOTE: when you use <a
+href="ForkManager.html#M000002">start</a>(&quot;string&quot;) with an
+optional block parameter, the code in your block <b>must</b> explicitly
+exit non-zero if you are using callbacks with the <a
+href="ForkManager.html">ForkManager</a> (e.g. <a
+href="ForkManager.html#M000009">run_on_finish</a>).</em> This is because
+fork(), when run with a block parameter, terminates the subprocess with a
+status of 0 by default. If your block fails to exit non-zero, <b>all</b> of
+your exit_code(s) will be zero regardless of any value you might have
+passed to <a href="ForkManager.html#M000003">finish</a>(&#8230;).
+</p>
+<p>
+To accommodate this behavior of fork and blocks, you can do something like
+the following:
+</p>
+<pre>
+  my_urls = [ ... some list of urls here ... ]
+  my_ident = &quot;webwacker-1.0&quot;
+
+  my_urls.each {
+      |my_url|
+      pm.start(my_ident) {
+          my_status = get_some_url(my_url)
+          if my_status.to_i == 200
+              exit 0
+          else
+              exit 255
+      }
+  }
+
+  ... etc ...
+</pre>
+<p>
+Return: PID of child process if in parent, or 0 if in the child process.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000007" class="method-detail">
+        <a name="M000007"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000007.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000007.html');return false;">
+          <span class="method-name">wait_all_children</span><span class="method-args">()</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000007">wait_all_children</a>() will wait for
+all the processes which have been forked. This is a blocking wait.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000008" class="method-detail">
+        <a name="M000008"></a>
+
+        <div class="method-heading">
+          <span class="method-name">wait_all_childs</span><span class="method-args">()</span>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Alias for <a href="ForkManager.html#M000007">wait_all_children</a>
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000004" class="method-detail">
+        <a name="M000004"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000004.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000004.html');return false;">
+          <span class="method-name">wait_children</span><span class="method-args">()</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+        </div>
+      </div>
+
+      <div id="method-M000005" class="method-detail">
+        <a name="M000005"></a>
+
+        <div class="method-heading">
+          <span class="method-name">wait_childs</span><span class="method-args">()</span>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Alias for <a href="ForkManager.html#M000004">wait_children</a>
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000006" class="method-detail">
+        <a name="M000006"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000006.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000006.html');return false;">
+          <span class="method-name">wait_one_child</span><span class="method-args">(par)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Probably won&#8216;t want to call this directly. Just let <a
+href="ForkManager.html#M000007">wait_all_children</a>(&#8230;) make the
+call for you.
+</p>
+        </div>
+      </div>
+
+      <h3 class="section-bar">Private Instance methods</h3>
+
+      <div id="method-M000017" class="method-detail">
+        <a name="M000017"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000017.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000017.html');return false;">
+          <span class="method-name">_NT_waitpid</span><span class="method-args">(pid, par)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000017">_NT_waitpid</a>(&#8230;) is a private
+method as it should not be called directly.
+</p>
+<p>
+<a href="ForkManager.html#M000017">_NT_waitpid</a>(&#8230;) implements the
+Windows variant of <a href="ForkManager.html#M000016">_waitpid</a>(&#8230;)
+and will be called automatically by <a
+href="ForkManager.html#M000006">wait_one_child</a>(&#8230;) depending on
+the value of RUBY_PLATFORM.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000018" class="method-detail">
+        <a name="M000018"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000018.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000018.html');return false;">
+          <span class="method-name">_serialize_data</span><span class="method-args">(store_tempfile)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000018">_serialize_data</a> is a private method
+and should not be called directly.
+</p>
+<p>
+Currently only supports Marshal.dump() to serialize data.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000019" class="method-detail">
+        <a name="M000019"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000019.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000019.html');return false;">
+          <span class="method-name">_unserialize_data</span><span class="method-args">(store_tempfile)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000019">_unserialize_data</a> is a private
+method and should not be called directly.
+</p>
+<p>
+Currently only supports Marshal.load() to unserialize data.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000016" class="method-detail">
+        <a name="M000016"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000016.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000016.html');return false;">
+          <span class="method-name">_waitpid</span><span class="method-args">(pid, flags)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000016">_waitpid</a>(&#8230;) is a private
+method as it should not be called directly. It is called automatically by
+<a href="ForkManager.html#M000006">wait_one_child</a>(&#8230;).
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000010" class="method-detail">
+        <a name="M000010"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000010.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000010.html');return false;">
+          <span class="method-name">on_finish</span><span class="method-args">(*params)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000010">on_finish</a> is a private method and
+should not be called directly.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000014" class="method-detail">
+        <a name="M000014"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000014.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000014.html');return false;">
+          <span class="method-name">on_start</span><span class="method-args">(*params)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000014">on_start</a>() is a private method as it
+should not be called directly.
+</p>
+        </div>
+      </div>
+
+      <div id="method-M000012" class="method-detail">
+        <a name="M000012"></a>
+
+        <div class="method-heading">
+          <a href="ForkManager.src/M000012.html" target="Code" class="method-signature"
+            onclick="popupCode('ForkManager.src/M000012.html');return false;">
+          <span class="method-name">on_wait</span><span class="method-args">()</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+<a href="ForkManager.html#M000012">on_wait</a> is a private method as it
+should not be called directly.
+</p>
+        </div>
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

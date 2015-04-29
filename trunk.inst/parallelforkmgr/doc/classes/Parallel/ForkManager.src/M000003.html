@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+<head>
+  <title>finish (Parallel::ForkManager)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre><span class="ruby-comment cmt"># File lib/parallel/forkmanager.rb, line 282</span>
+    <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">finish</span>(<span class="ruby-identifier">exit_code</span> = <span class="ruby-value">0</span>)
+        <span class="ruby-keyword kw">if</span> <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">has_block</span>
+            <span class="ruby-identifier">raise</span> <span class="ruby-value str">&quot;Do not use finish(...) when using blocks.  Use an explicit exit in your block instead!\n&quot;</span>
+        <span class="ruby-keyword kw">end</span>
+
+        <span class="ruby-keyword kw">if</span> <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">in_child</span>
+            <span class="ruby-identifier">exit_code</span> <span class="ruby-operator">||=</span> <span class="ruby-value">0</span>
+            <span class="ruby-constant">Kernel</span>.<span class="ruby-identifier">exit!</span>(<span class="ruby-identifier">exit_code</span>)
+        <span class="ruby-keyword kw">end</span>
+
+        <span class="ruby-keyword kw">if</span> <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">max_proc</span> <span class="ruby-operator">==</span> <span class="ruby-value">0</span>
+            <span class="ruby-identifier">on_finish</span>(<span class="ruby-identifier">$$</span>, <span class="ruby-identifier">exit_code</span>, <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">processes</span>[<span class="ruby-identifier">$$</span>], <span class="ruby-value">0</span>, <span class="ruby-value">0</span>)
+            <span class="ruby-keyword kw">self</span>.<span class="ruby-identifier">processes</span>.<span class="ruby-identifier">delete</span>(<span class="ruby-identifier">$$</span>)
+        <span class="ruby-keyword kw">end</span>
+        <span class="ruby-keyword kw">return</span> <span class="ruby-value">0</span>
+    <span class="ruby-keyword kw">end</span></pre>
+</body>
+</html>

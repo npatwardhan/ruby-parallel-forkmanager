@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>File: forkmanager.rb</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+    
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+  
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }</style>" )
+  
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+
+  <div id="fileHeader">
+    <h1>forkmanager.rb</h1>
+    <table class="header-table">
+    <tr class="top-aligned-row">
+      <td><strong>Path:</strong></td>
+      <td>lib/parallel/forkmanager.rb
+      </td>
+    </tr>
+    <tr class="top-aligned-row">
+      <td><strong>Last Update:</strong></td>
+      <td>Thu Jan 28 17:01:20 -0500 2010</td>
+    </tr>
+    </table>
+  </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+
+
+  <div id="contextContent">
+
+    <div id="description">
+      <p>
+<a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+&#8212; A simple parallel processing fork manager.
+</p>
+<p>
+Copyright (c) 2008 - 2010 Nathan Patwardhan
+</p>
+<p>
+Author: Nathan Patwardhan &lt;noopy.org@gmail.com&gt;
+</p>
+<p>
+Documentation: Nathan Patwardhan &lt;noopy.org@gmail.com&gt;, based on Perl
+<a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+documentation by Noah Robin &lt;sitz@onastick.net&gt; and dlux
+&lt;dlux@kapu.hu&gt;.
+</p>
+<p>
+Credits (for original Perl implementation):
+</p>
+<ul>
+<li>Chuck Hirstius &lt;chirstius@megapathdsl.net&gt; (callback exit status,
+original Perl example)
+
+</li>
+<li>Grant Hopwood &lt;hopwoodg@valero.com&gt; (win32 port)
+
+</li>
+<li>Mark Southern &lt;mark_southern@merck.com&gt; (bugfix)
+
+</li>
+</ul>
+<p>
+Credits (Ruby port):
+</p>
+<ul>
+<li>Robert Klemme &lt;shortcutter@googlemail.com&gt;, David A. Black
+&lt;dblack@rubypal.com&gt; (general awesomeness)
+
+</li>
+<li>Roger Pack &lt;rogerdpack@gmail.com&gt; (bugfix, fork semantics in start,
+doc changes)
+
+</li>
+<li>Mike Stok &lt;mike@stok.ca&gt; (test cases, percussion, backing vocals)
+
+</li>
+</ul>
+<h2>Overview</h2>
+<p>
+<a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+is used for operations that you would like to do in parallel (e.g.
+downloading a bunch of web content simultaneously) but would prefer to use
+fork() instead of threads. Instead of managing child processes yourself <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+handles the cleanup for you. <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+also provides some useful callbacks you can use at start and finish, or
+while you&#8216;re waiting for child processes to complete.
+</p>
+<h2>Introduction</h2>
+<p>
+If you&#8216;ve used fork() before, you&#8216;re well aware that you need
+to be responsible for managing (i.e. cleaning up) the processes that were
+created as a result. <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+handles this for you such that you start() and finish() a process without
+having to worry about child processes along the way.
+</p>
+<p>
+For instance you can use the following code to grab a list of webpages in
+parallel using Net::HTTP &#8212; and store the output in files.
+</p>
+<h2>Example</h2>
+<pre>
+ #!/usr/bin/env ruby
+
+ require 'rubygems'
+ require 'net/http'
+ require 'forkmanager'
+
+ my_urls = [
+     'url1',
+     'url2',
+     'urlN'
+ ]
+
+ max_proc = 20
+ my_timeout = 5 # seconds
+
+ pfm = Parallel::ForkManager.new(max_proc)
+
+ my_urls.each {
+     |my_url|
+
+     begin
+         pfm.start(my_url) and next # blocks until new fork slot is available
+
+         # doing stuff here with my_url will be in a child
+         url = URI.parse(my_url)
+
+         begin
+             http = Net::HTTP.new(url.host, url.port)
+             http.open_timeout = http.read_timeout = my_timeout
+             res = http.get(url.path)
+             status = res.code
+         rescue Timeout::Error
+             print &quot;*** #{my_url} timed out!\n&quot;
+             pfm.finish(255)
+         end
+     rescue
+         print &quot;Connection to #{my_url} had an unspecified error!\n&quot;
+         pfm.finish(255)
+     end
+
+     if status.to_i == 200
+         pfm.finish(0) # exit the forked process with this status
+     else
+         pfm.finish(255) # exit the forked process with this status
+     end
+ }
+
+ pfm.wait_all_children()
+</pre>
+<p>
+First you need to instantiate the ForkManager with the &quot;new&quot;
+constructor. You must specify the maximum number of processes to be
+created. If you specify 0, then NO fork will be done; this is good for
+debugging purposes.
+</p>
+<p>
+Next, use pfm.start() to do the fork. pfm returns 0 for the child process,
+and child pid for the parent process. The &quot;and next&quot; skips the
+internal loop in the parent process.
+</p>
+<ul>
+<li>pm.start() dies if the fork fails.
+
+</li>
+<li>pfm.finish() terminates the child process (assuming a fork was done in the
+&quot;start&quot;).
+
+</li>
+<li>You cannot use pfm.start() if you are already in the child process.
+
+</li>
+</ul>
+<p>
+If you want to manage another set of subprocesses in the child process, you
+must instantiate another <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+object!
+</p>
+<h2>Revision History</h2>
+<ul>
+<li>1.2.0, 2010-02-01: Resolves bug [27748] finish throws an error when used
+with start(ident). Adds block support to run_on_start(), run_on_wait(),
+run_on_finish().
+
+</li>
+<li>1.1.1, 2010-01-05: Resolves bug with Errno::ECHILD.
+
+</li>
+<li>1.1.0, 2010-01-01: Resolves bug [27661] forkmanager doesn&#8216;t fork!.
+Adds block support to start() w/doc changes for same.
+
+</li>
+<li>1.0.1, 2009-10-24: Resolves bug [27328] dies with max procs 1.
+
+</li>
+<li>1.0.0, 2008-11-03: Initial release.
+
+</li>
+</ul>
+<h2>Bugs and Limitations</h2>
+<p>
+<a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+is a Ruby port of Perl <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+0.7.5. While much of the original code was rewritten such that ForkManager
+worked in the &quot;Ruby way&quot;, you might find some &quot;warts&quot;
+due to inconsistencies between Ruby and the original Perl code. Bug reports
+and feature requests are always welcome.
+</p>
+<p>
+Do not use <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+in an environment where other child processes can affect the run of the
+main program, so using this module is not recommended in an environment
+where fork() / wait() is already used.
+</p>
+<p>
+If you want to use more than one copy of the <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+then you have to make sure that all children processes are terminated
+&#8212; before you use the second object in the main program.
+</p>
+<p>
+You are free to use a new copy of <a
+href="../../../classes/Parallel/ForkManager.html">Parallel::ForkManager</a>
+in the child processes, although I don&#8216;t think it makes sense.
+</p>
+
+    </div>
+
+
+   </div>
+
+
+  </div>
+
+
+    <!-- if includes -->
+    <div id="includes">
+      <h3 class="section-bar">Included Modules</h3>
+
+      <div id="includes-list">
+        <span class="include-name">Process</span>
+      </div>
+    </div>
+
+    <div id="section">
+
+
+
+
+
+      
+
+
+    <!-- if method_list -->
+
+
+  </div>
+
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

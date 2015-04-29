@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+<head>
+  <title>_serialize_data (Parallel::ForkManager)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre><span class="ruby-comment cmt"># File lib/parallel/forkmanager.rb, line 951</span>
+    <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">_serialize_data</span>(<span class="ruby-identifier">store_tempfile</span>)
+        <span class="ruby-identifier">retval</span> = <span class="ruby-value">0</span>
+
+        <span class="ruby-keyword kw">if</span> <span class="ruby-ivar">@serialize_as</span> <span class="ruby-operator">==</span> <span class="ruby-value str">&quot;marshal&quot;</span>
+            <span class="ruby-keyword kw">begin</span>
+                <span class="ruby-identifier">f</span> = <span class="ruby-constant">File</span>.<span class="ruby-identifier">new</span>(<span class="ruby-identifier">store_tempfile</span>, <span class="ruby-value str">&quot;wb&quot;</span>)
+            
+                <span class="ruby-identifier">obj</span> = <span class="ruby-constant">Marshal</span>.<span class="ruby-identifier">dump</span>(<span class="ruby-ivar">@data_structure</span>)
+                <span class="ruby-identifier">f</span>.<span class="ruby-identifier">write</span>(<span class="ruby-identifier">obj</span>)
+            
+                <span class="ruby-identifier">f</span>.<span class="ruby-identifier">close</span>()
+            
+                <span class="ruby-identifier">retval</span> = <span class="ruby-value">1</span>
+            <span class="ruby-keyword kw">rescue</span>  =<span class="ruby-operator">&gt;</span> <span class="ruby-identifier">e</span>
+                <span class="ruby-identifier">raise</span> <span class="ruby-node">&quot;Error writing #{store_tempfile}: #{e.message}&quot;</span>
+            <span class="ruby-keyword kw">end</span>
+        <span class="ruby-keyword kw">else</span>
+            <span class="ruby-identifier">print</span> <span class="ruby-node">&quot;Unsupported serialization method: #{@serialize_as}!\n&quot;</span>
+        <span class="ruby-keyword kw">end</span>
+        
+        <span class="ruby-keyword kw">return</span> <span class="ruby-identifier">retval</span>
+    <span class="ruby-keyword kw">end</span></pre>
+</body>
+</html>
