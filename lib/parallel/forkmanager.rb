@@ -1,6 +1,6 @@
 # = Parallel::ForkManager -- A simple parallel processing fork manager.
 #
-# == Copyright (c) 2008 - 2011 Nathan Patwardhan
+# == Copyright (c) 2008 - 2015 Nathan Patwardhan
 #
 # All rights reserved. This program is free software; you can redistribute
 # it and/or modify it under the same terms as Ruby itself.
@@ -11,15 +11,18 @@
 #
 # Nathan Patwardhan <noopy.org@gmail.com>, based on Perl Parallel::ForkManager documentation by Noah Robin <sitz@onastick.net> and dLux <dlux@dlux.hu>.
 #
-# == Credits (for original Perl implementation):
+# == Credits (Perl):
 #
-# - dLux <dlux@dlux.hu> (original Perl module)
+# - dLux <dlux@dlux.hu> (author, original Perl module)
+# - Gábor Szabó (szabgab@cpan.org)  (co-maintainer)
+# - Michael Gang (bug report)
+# - Noah Robin <sitz@onastick.net> (documentation tweaks)
 # - Chuck Hirstius <chirstius@megapathdsl.net> (callback exit status, original Perl example)
 # - Grant Hopwood <hopwoodg@valero.com> (win32 port)
 # - Mark Southern <mark_southern@merck.com> (bugfix)
 # - Ken Clarke <www.perlprogrammer.net>  (data structure retrieval)
 #
-# == Credits (Ruby port):
+# == Credits (Ruby):
 #
 # - Robert Klemme <shortcutter@googlemail.com>, David A. Black <dblack@rubypal.com>        (general awesomeness)
 # - Roger Pack <rogerdpack@gmail.com>          (bugfix, fork semantics in start, doc changes)
@@ -28,14 +31,18 @@
 # == Overview
 #
 # Parallel::ForkManager is used for operations that you would like to do
-# in parallel (e.g. downloading a bunch of web content simultaneously) but
-# uses fork() to handle parallel processing instead of threads.  If you've
-# used fork() before, you're aware that you need to be responsible for
-# managing (i.e. cleaning up) the processes that were created as a result.
+# in parallel.  Typical use is a downloader which could be retrieving
+# hundreds and/or thousands of files.
+#
+# Parallel::ForkManager, as its name suggests, uses fork() to handle parallel
+# processing instead of threads.  If you've used fork() before, you're aware
+# that you need to be responsible for managing (i.e. cleaning up) the
+# processes that were created as a result of the fork().
+#
 # Parallel::ForkManager handles this for you such that you start() and
 # finish() without having to worry about child processes along
 # the way.  Further, Parallel::ForkManager provides useful callbacks
-# that you can use when a child starts and/or finishes -- or while you're
+# that you can use when a child starts and/or finishes, or while you're
 # waiting for a child to complete.
 #
 # The code for a downloader that uses Net::HTTP would look like this:
@@ -89,19 +96,18 @@
 #
 # Next, use pm.start() to do the fork. pfm returns 0 for the child process, 
 # and child pid for the parent process.  The "and next" skips the internal
-# loop in the parent process.
+# loop in the parent process.  NOTE: pm.start() dies if the fork fails.
 #
-# - pm.start() dies if the fork fails.
+# pm.finish() terminates the child process (assuming a fork was done in the
+# "start").
 #
-# - pm.finish() terminates the child process (assuming a fork was done in the "start").
-#
-# - You cannot use pm.start() if you are already in the child process. 
-#   If you want to manage another set of subprocesses in the child process, 
-#   you must instantiate another Parallel::ForkManager object!
+# NOTE: You cannot use pm.start() if you are already in the child process. 
+# If you want to manage another set of subprocesses in the child process, 
+# you must instantiate another Parallel::ForkManager object!
 #
 # == Revision History
 #
-# - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.
+# - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.  May the 4th be with you.
 # - 1.5.1, 2011-03-04: Resolves bug [#29043] wait_one_child failed to retrieve object.  Adds conversion of Object to Hash before serialization to avoid 'singleton can't be dumped' error.  Minor documentation changes for initialize().
 # - 1.5.0, 2011-02-25: Implements data structure retrieval as had appeared in Perl Parallel::ForkManager 0.7.6.  Removes support for passing Proc to run_on_* methods; now supports blocks instead.  Documentation updates and code cleanup.
 # - 1.2.0, 2010-02-01: Resolves bug [#27748] finish throws an error when used with start(ident).  Adds block support to run_on_start(), run_on_wait(), run_on_finish().
@@ -113,9 +119,9 @@
 # == Bugs and Limitations
 #
 # Parallel::ForkManager is a Ruby port of Perl Parallel::ForkManager
-# 0.7.9.  It was originally ported from Perl Parallel::ForkManager 0.7.5
+# 1.12.  It was originally ported from Perl Parallel::ForkManager 0.7.5
 # but was recently updated to integrate features implemented in Perl
-# Parallel::ForkManager versions 0.7.6 - 0.7.9.  Bug reports and feature
+# Parallel::ForkManager versions 0.7.6 - 1.12.  Bug reports and feature
 # requests are always welcome.
 #
 # Do not use Parallel::ForkManager in an environment where other child
@@ -315,49 +321,47 @@ include Process
 module Parallel
 
 class ForkManager
-    VERSION = '1.5.1' # $Revision: 55 $
+    VERSION = '2.0.0' # $Revision: 55 $
 
 # new(max_procs, [params, debug])
 #
-# Instantiate a Parallel::ForkManager object. You must
-# specify the maximum number of children to fork off. If you specify 0 (zero),
-# then no children will be forked and debugging output will be enabled.
+# Instantiate a Parallel::ForkManager object. You must specify the maximum
+# number of children to fork off. If you specify 0 (zero), then no children
+# will be forked.  This is intended for debugging purposes.
 #
 # The optional second parameter, params, is only used if you want to customize
 # the behavior that children will use to send back some data (see Retrieving
 # Data Structures below) to the parent.  The following values are currently
 # accepted for params (and their meanings):
 # - params['tempdir'] represents the location of the temporary directory where serialized data structures will be stored.
-# - params['serialize_as'] represents how the data will be serialized # (NOTE: currently unimplemented in Parallel::ForkManager 1.5.1).
+# - params['serialize_as'] represents how the data will be serialized.  If not specified, serialize_as will default to 'marshal'.
 #
 # If params has not been provided, the following values are set:
+# - @debug is set to non-zero to provide debugging messages.  Default is 0.
 # - @tempdir is set to Dir.tmpdir() (likely defaults to /tmp).
-# - @serialize_as is set to 'marshal'.
+# - @serialize_as is set to 'marshal' or 'yaml'.  Default is 'marshal'.
 #
-# NOTE NOTE NOTE: If you set tempdir to a directory that doe not exist,
+# NOTE NOTE NOTE: If you set tempdir to a directory that does not exist,
 # Parallel::ForkManager will <em>not</em> create this directory for you
 # and new() will exit!
 #
-# The optional third parameter, debug, is used to set debugging behavior
-# for Parallel::ForkManager.  Default value for debug is 0 (off).
 #
 
-    def initialize(max_procs = 0, params = {}, debug = 0)
+    def initialize(max_procs = 0, params = {})
         @max_procs = max_procs
-        @debug = debug # Set debug to 1 for debugging messages.
-        @params = params
         @processes = {}
         @do_on_finish = {}
         @in_child = false
         @has_block = false
         @on_wait_period = nil
 	@parent_pid = $$
-        @tempdir = @params['tempdir'] || Dir.tmpdir()
-        @do_serialize = 0
+        @waitpid_blocking_sleep = 1
+        @params = params
+        @debug = (defined? @params['debug']) ? @params['debug'] : 0
+        @tempdir = (@params.has_key?('tempdir')) ? @params['tempdir'] : Dir.tmpdir()
+        @auto_cleanup = (defined? @params['tempdir']) ? 1 : 0
         @serialize_as = nil
         @data_structure = nil
-        @auto_cleanup = (defined? @params['tempdir']) ? 1 : 0
-        @waitpid_blocking_sleep = 1
 
         # Make sure that @tempdir has a trailing slash.
         @tempdir <<= (@tempdir[(@tempdir.length-1)..-1] != "/") ? "/" : ""
@@ -374,30 +378,27 @@ class ForkManager
         end
         
         if @params.keys.length > 0
-            if !defined? params['tempdir']
+            if !defined? @tempdir
                 print "params missing required argument: tempdir!"
                 exit 1
             end
-            
-            if ! File.directory? @params['tempdir']
-                print "Temporary directory #{@params['tempdir']} doesn't exist or is not a directory.\n"
+           
+            if ! File.directory? @tempdir
+                print "Temporary directory #{@tempdir} doesn't exist or is not a directory.\n"
                 exit 1
             end
             @tempdir = @params['tempdir']
-            @do_serialize = 1
 
             #
-            # As of version 2.0, Marshal is the only way to serialize data that
-            # we support.  YAML and others will likely be supported in later
-            # versions.
+            # As of version 2.0.0, YAML support has been added.
             #
-            if params.has_key? "serialize_as" or params.has_key? "serialize_type"
-                @serialize_as = (params.has_key? "serialize_as") ? params['serialize_as'] : params['serialize_type']
+            if params.has_key?("serialize_as") or params.has_key?("serialize_type")
+                @serialize_as = (params.has_key?("serialize_as")) ? params['serialize_as'] : params['serialize_type']
             else
                 @serialize_as = 'marshal'
             end
-        else
-            @serialize_as = 'marshal'
+
+            @serialize_as = @serialize_as.downcase
         end
     end
 
@@ -564,7 +565,10 @@ class ForkManager
 #
 # Data structure retrieval is <em>not</em> the same as returning a data
 # structure from a method call!  The data structure referenced by a given
-# child process is serialized and written out to a file by <em>Marshal</em>.
+# child process is serialized and written out to a file in the type specified
+# earlier in serialize_as.  If serialize_as was not specified earlier, then
+# no serialization will be done.
+#
 # The file is subseqently read back into memory and a new data structure that
 # belongs to the parent process is created.  Therefore it is recommended that
 # you keep the returned structure small in size to mitigate any possible
@@ -579,23 +583,14 @@ class ForkManager
             exit_code ||= 0
 
             if !data_structure.nil?
-                # Convert object to hash.  Else Marshal won't be
-                # able to serialize it.
-                #
-                if data_structure.class.to_s.downcase == "object"
-                    temp_data_structure = data_structure.to_hash
-                    data_structure = temp_data_structure
-                end
-
                 @data_structure = data_structure
+
                 the_tempfile = @tempdir
                 the_tempfile = "#{@tempdir}Parallel-ForkManager-#{@parent_pid.to_s}-#{$$.to_s}.txt"
                 
                 begin
-                    if @do_serialize == 1
-                        if !_serialize_data(the_tempfile)
-                            raise "Unable to serialize data!\n"
-                        end
+                    if !_serialize_data(the_tempfile)
+                        raise "Unable to serialize data!\n"
                     end
                 rescue => e
                     print "Unable to store #{the_tempfile}: #{e.message}\n"
@@ -647,14 +642,12 @@ class ForkManager
             the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$$.to_s}-#{kid.to_s}.txt"
             
             begin
-                if @do_serialize == 1
-                    if File.exists?(the_tempfile) and ! File.zero?(the_tempfile)
-                        if ! _unserialize_data(the_tempfile)
-                            raise "Unable to unserialize data!\n"
-                        end
-
-                        the_retr_data = @data_structure
+                if File.exists?(the_tempfile) and ! File.zero?(the_tempfile)
+                    if ! _unserialize_data(the_tempfile)
+                        raise "Unable to unserialize data!\n"
                     end
+
+                    the_retr_data = @data_structure
                 end
 
                 if File.exists?(the_tempfile)
@@ -983,28 +976,34 @@ class ForkManager
 #
 # _serialize_data is a private method and should not be called directly.
 #
-# Currently only supports Marshal.dump() to serialize data.
+# Currently supports Marshal.dump() and YAML to serialize data.
 #
     def _serialize_data(store_tempfile)
         retval = 0
 
-        if @serialize_as == "marshal"
+        if @serialize_as.nil?
+            retval = 1
+        else
             begin
                 f = File.new(store_tempfile, "wb")
-            
-                obj = Marshal.dump(@data_structure)
+
+                if @serialize_as == "marshal"
+                    obj = Marshal.dump(@data_structure.to_hash)
+                elsif @serialize_as == "yaml"
+                    obj = YAML::dump(@data_structure)
+                else
+                    raise "Unknown serialization method: #{@serialize_as}"
+                end
+
                 f.write(obj)
-            
                 f.close()
-            
+
                 retval = 1
-            rescue  => e
+            rescue => e
                 raise "Error writing #{store_tempfile}: #{e.message}"
             end
-        else
-            print "Unsupported serialization method: #{@serialize_as}!\n"
         end
-        
+
         return retval
     end
 
@@ -1016,7 +1015,9 @@ class ForkManager
     def _unserialize_data(store_tempfile)
         retval = 0
 
-        if @serialize_as == "marshal"
+        if @serialize_as.nil?
+            retval = 1
+        else
             begin
                 to_obj = String.new()
 
@@ -1028,8 +1029,15 @@ class ForkManager
                 }
             
                 f.close()
-            
-                @data_structure = Marshal.load(to_obj)
+
+                if @serialize_as == "marshal"
+                    @data_structure = Marshal.load(to_obj)
+                elsif @serialize_as = "yaml"
+                    @data_structure = YAML::load(to_obj)
+                else
+                    raise "Unknown serialization method: #{@serialize_as}"
+                end
+
                 retval = 1
             rescue => e
                 raise "Error reading #{store_tempfile}: #{e.message}"
@@ -1040,8 +1048,6 @@ class ForkManager
                     File.unlink(store_tempfile)
                 end
             end
-        else
-            print "Unsupported serialization method: #{@serialize_as}!\n"
         end
 
         return retval
