@@ -620,7 +620,7 @@ class ForkManager
         begin
             begin
                 kid = wait_one_child(Process::WNOHANG)
-            end while kid > 0 || kid < -1
+                end while kid > 0 || kid < -1
         rescue Errno::ECHILD
             return
         end
@@ -637,18 +637,12 @@ class ForkManager
 
         kid = nil
         while true
-            # Call _NT_waitpid(...) if we're using a Windows or Java variant.
-            if(RUBY_PLATFORM =~ /mswin|mingw|bccwin|wince|emx|java/)
-                kid = _NT_waitpid(-1, params)
-            else
-                kid = _waitpid(-1, params)
-            end
-
-            break if kid == nil or kid == -1 # Win32 returns negative PIDs
-
+            kid = _waitpid(-1, params)
+            break if kid == nil or kid == 0 or kid == -1 # Win32 returns negative PIDs
             redo if ! @processes.has_key?(kid)
             id = @processes.delete(kid)
-            
+
+            # Retrieve child data structure, if any.            
             the_retr_data = {}
             the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$$.to_s}-#{kid.to_s}.txt"
             
@@ -696,6 +690,32 @@ class ForkManager
     end
     
     alias :wait_all_childs :wait_all_children # compatibility
+
+#
+# FIX DOCS
+#
+    def max_procs()
+        return @max_procs
+    end
+
+#
+# FIX DOCS
+#
+    def running_procs()
+        pids = @processes.keys()
+        return pids
+    end
+
+#
+# FIX DOCS
+#
+    def wait_for_available_procs(nbr)
+        nbr ||= 1
+
+        raise "Number processes '#{nbr}' higher than then max number of processes: #{@max_procs}" if nbr > max_procs()
+
+        wait_one_child until (max_procs() - running_procs()) >= nbr
+    end
 
 #
 # You can define run_on_finish(...) that is called when a child in the parent
@@ -839,7 +859,7 @@ class ForkManager
                     # case it's no matter, since we define handler, but yikes.
                     #
                     Signal.trap("CHLD") do
-                        lambda{}.call()
+                        lambda{}.call() if Signal.list["CHLD"].nil?
                     end
                     IO.select(nil, nil, nil, @on_wait_period)
                 end
@@ -855,10 +875,7 @@ class ForkManager
 # - pid of the process which has been started
 # - identification of the process (if provided in the "start" method)
 #
-# <em>NOTE NOTE NOTE: Passing Proc to run_on_start has been deprecated as of Parallel::ForkManager 1.5!  Please use the form shown below now!</em>
-#
-# As of Parallel::ForkManager 1.2.0 run_on_start supports a block argument
-# instead of needing to pass in a Proc explicitly.
+# You can pass a block to run_on_start.
 #
 # Example:
 #
@@ -867,21 +884,10 @@ class ForkManager
 #           print "run on start ::: #{ident} (#{pid})\n"
 #       }
 #
-# Note that code and block are mutually exclusive arguments.  If you try
-# to use pass both a Proc and a block to run_on_start it will raise an error.
 #
-    def run_on_start(code=nil, &block)
+    def run_on_start(&block)
         begin
-            if ! code.nil? && ! block.nil?
-                raise "run_on_start: code and block are mutually exclusive arguments!"
-            end
-
-            if ! code.nil?
-                if code.class.to_s == "Proc" and VERSION >= "1.5.0"
-                    print "Passing Proc has been deprecated as of Parallel::ForkManager #{VERSION}!\nPlease refer to rdoc about how to change your code!\n"
-                end
-                @do_on_start = code
-            elsif !block.nil?
+            if !block.nil?
                 @do_on_start = block
             end
         rescue TypeError
@@ -910,53 +916,68 @@ class ForkManager
     end
 
 #
-# set_max_procs(mp) -- mp is an integer
-#
-# set_max_procs() allows you to set a new maximum number of children to maintain.
-#
-# Return: The previous setting of max_procs.
+# set_max_procs() allows you to set a new maximum number of children
+# to maintain.
 #
     def set_max_procs(mp=nil)
-        if mp == nil
-            return @max_procs
-        else
-            @max_procs = mp
-        end
+        @max_procs = mp
+    end
+
+#
+# FIX DOCS
+#
+    def set_waitpid_blocking_sleep(period)
+        @waitpid_blocking_sleep = period
+    end
+
+#
+# FIX DOCS
+#
+    def waitpid_blocking_sleep()
+        return @waitpid_blocking_sleep
     end
 
 #
 # _waitpid(...) is a private method as it should not be called directly.
 # It is called automatically by wait_one_child(...).
 #
-    def _waitpid(pid, flags)
-        return waitpid(pid, flags)
+    def _waitpid(pid, flag)
+        return flag ? _waitpid_non_blocking() : _waitpid_blocking()
     end
 
 #
-# _NT_waitpid(...) is a private method as it should not be called directly.
+# FIX DOCS
 #
-# _NT_waitpid(...) implements the Windows variant of _waitpid(...) and will
-# be called automatically by wait_one_child(...) depending on the value of
-# RUBY_PLATFORM.
+    def _waitpid_non_blocking()
+        running_procs().each {
+            |pid|
+            p = waitpid(pid, Process::WNOHANG) or next
+            if p == -1
+                warn "Child process #{pid} disappeared.  A call to 'waitpid' outside of Parallel::ForkManager might have reaped it."
+                # It's gone.  Let's clean the process entry.
+                @processes.delete[pid]
+            else
+                return pid
+            end
+        }
+
+        return 0
+    end
+
 #
-    def _NT_waitpid(pid, par)
-        if par == Process::WNOHANG
-            pids = @processes.keys()
-            if pids.length() == 0
-                return -1
-            end
-            
-            kid = 0
-            for my_pid in pids
-                kid = waitpid(my_pid, par)
-                if kid != 0
-                    return kid
-                end
-            return kid
-            end
-        else
-            return waitpid(pid, par)    
+# FIX DOCS
+#
+    def _waitpid_blocking()
+        # pseudo-blocking
+        sleep_period = @waitpid_blocking_sleep
+        while true do
+            pid = _waitpid_non_blocking()
+            return pid if pid
+
+            sleep(sleep_period)
         end
+
+        return waitpid(-1, 0)
     end
 
 #
@@ -1027,7 +1048,8 @@ class ForkManager
     end
 
     # private methods
-    private :on_start, :on_finish, :on_wait, :_waitpid, :_NT_waitpid
+    private :on_start, :on_finish, :on_wait
+    private :_waitpid, :_waitpid_non_blocking, :_waitpid_blocking
     private :_serialize_data, :_unserialize_data
 
 end # class
