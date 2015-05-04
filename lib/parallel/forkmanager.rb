@@ -323,7 +323,7 @@ module Parallel
 class ForkManager
     VERSION = '2.0.0' # $Revision: 55 $
 
-# new(max_procs, [params, debug])
+# new(max_procs, [params])
 #
 # Instantiate a Parallel::ForkManager object. You must specify the maximum
 # number of children to fork off. If you specify 0 (zero), then no children
@@ -334,7 +334,7 @@ class ForkManager
 # Data Structures below) to the parent.  The following values are currently
 # accepted for params (and their meanings):
 # - params['tempdir'] represents the location of the temporary directory where serialized data structures will be stored.
-# - params['serialize_as'] represents how the data will be serialized.  If not specified, serialize_as will default to 'marshal'.
+# - params['serialize_as'] represents how the data will be serialized.
 #
 # If params has not been provided, the following values are set:
 # - @debug is set to non-zero to provide debugging messages.  Default is 0.
@@ -348,6 +348,9 @@ class ForkManager
 #
 
     def initialize(max_procs = 0, params = {})
+        # Appetite for Destruction.
+        ObjectSpace.define_finalizer(self, self.class.method(:finalizer))
+
         @max_procs = max_procs
         @processes = {}
         @do_on_finish = {}
@@ -366,7 +369,7 @@ class ForkManager
         # Make sure that @tempdir has a trailing slash.
         @tempdir <<= (@tempdir[(@tempdir.length-1)..-1] != "/") ? "/" : ""
         
-        # Always provide debug information if our max processes are zero!        
+        # Always provide debug information if our max processes are zero!
         if @max_procs.zero?
             print "Zero processes have been specified so we will not fork and will proceed in debug mode!\n"
             @debug = 1
@@ -390,7 +393,7 @@ class ForkManager
             @tempdir = @params['tempdir']
 
             #
-            # As of version 2.0.0, YAML support has been added.
+            # Setup our serialization type.
             #
             if params.has_key?("serialize_as") or params.has_key?("serialize_type")
                 @serialize_as = (params.has_key?("serialize_as")) ? params['serialize_as'] : params['serialize_type']
@@ -402,16 +405,25 @@ class ForkManager
         end
     end
 
+    def self.finalizer()
+        #puts "this city is loaded with sluts!"
+        proc { $stderr.print "eh" }
+    end
+
 #
 # start("string") -- "string" identification is optional.
 #
 # start("string") "puts the fork in Parallel::ForkManager" -- as start() does
-# the fork().
+# the fork().  start() returns the pid of the child process for the parent,
+# and 0 for the child process.  If you set the 'processes' parameter for the
+# constructor to 0, then, assuming you're in the child process, pm.start()
+# simply returns 0.
 #
-# start("string") takes an optional "string" argument to
-# use as a process identifier.  It is used by 
-# the "run_on_finish" callback for identifying the finished
-# process.  See run_on_finish() for more information.  For example:
+# start("string") takes an optional "string" argument to use as a process
+# identifier.  It is used by the "run_on_finish" callback for identifying
+# the finished process.  See run_on_finish() for more information.
+#
+# For example:
 #
 #   my_ident = "webwacker-1.0"
 #   pm.start(my_ident)
@@ -448,12 +460,12 @@ class ForkManager
 #   }
 #
 # <em>NOTE NOTE NOTE: when you use start("string") with an optional block
-# parameter, the code in your block *must* explicitly exit non-zero if you are
-# using callbacks with the ForkManager (e.g. run_on_finish).</em>  This is
-# because fork(), when run with a block parameter, terminates the subprocess
-# with a status of 0 by default.  If your block fails to exit non-zero,
-# *all* of your exit_code(s) will be zero regardless of any value you might
-# have passed to finish(...).
+# parameter, the code in your block <em>must</em> explicitly exit non-zero
+# if you are using callbacks with the ForkManager (e.g. run_on_finish).</em>
+# This is because fork(), when run with a block parameter, terminates the
+# subprocess with a status of 0 by default.  If your block fails to exit
+# non-zero, *all* of your exit_code(s) will be zero regardless of any value
+# you might have passed to finish(...).
 #
 # To accommodate this behavior of fork and blocks, you can do
 # something like the following:
@@ -474,8 +486,6 @@ class ForkManager
 #
 #   ... etc ...
 #
-# Return: PID of child process if in parent, or 0 if in the
-# child process.
 
     def start(identification=nil, *args, &run_block)
         if @in_child
@@ -523,10 +533,10 @@ class ForkManager
 #
 # finish(exit_code, [data_structure]) -- exit_code is optional
 #
-# finish() loses the child process by exiting and accepts an optional exit code.
-# Default exit code is 0 and can be retrieved in the parent via callback.
-# If you're running the program in debug mode (max_proc == 0), this method
-# doesn't do anything.
+# finish() closes the child process by exiting and accepts an optional exit
+# code (default exit code is 0) which can be retrieved in the parent via
+# callback.  If you're running the program in debug mode (max_proc == 0),
+# this method just calls the callback.
 #
 # If <em>data_structure</em> is provided, then <em>data structure</em> is
 # serialized and passed to the parent process. See <em>Retrieving Data
@@ -685,14 +695,17 @@ class ForkManager
     alias :wait_all_childs :wait_all_children # compatibility
 
 #
-# FIX DOCS
+# max_procs() -- Returns the maximal number of processes the object will fork.
 #
     def max_procs()
         return @max_procs
     end
 
 #
-# FIX DOCS
+# running_procs() -- Returns the pids of the forked processes currently
+# monitored by the Parallel::ForkManager.  Note that children are still
+# reports as running until the fork manager will harvest them, via the
+# next call to start(...) or wait_all_children().
 #
     def running_procs()
         pids = @processes.keys()
@@ -700,7 +713,8 @@ class ForkManager
     end
 
 #
-# FIX DOCS
+# wait_for_available_procs(nbr) -- Wait until 'n' available process slots
+# are available.  If 'n' is not given, defaults to I.
 #
     def wait_for_available_procs(nbr)
         nbr ||= 1
@@ -917,14 +931,16 @@ class ForkManager
     end
 
 #
-# FIX DOCS
+# set_wait_pid_blocking_sleep(seconds) -- Sets the sleep period,
+# in seconds, of the pseudo-blocking calls.  Set to 0 to disable.
 #
     def set_waitpid_blocking_sleep(period)
         @waitpid_blocking_sleep = period
     end
 
 #
-# FIX DOCS
+# waitpid_blocking_sleep() -- Returns the sleep period, in seconds, of the
+# pseudo-blockign calls.  Returns 0 if disabled.
 #
     def waitpid_blocking_sleep()
         return @waitpid_blocking_sleep
@@ -939,7 +955,7 @@ class ForkManager
     end
 
 #
-# FIX DOCS
+# Private method used internally by _waitpid(...).
 #
     def _waitpid_non_blocking()
         running_procs().each {
@@ -958,7 +974,8 @@ class ForkManager
     end
 
 #
-# FIX DOCS
+# Private method used internally by _waitpid(...).  Simulates a blocking
+# waitpid(...) call.
 #
     def _waitpid_blocking()
         # pseudo-blocking
@@ -1032,7 +1049,7 @@ class ForkManager
 
                 if @serialize_as == "marshal"
                     @data_structure = Marshal.load(to_obj)
-                elsif @serialize_as = "yaml"
+                elsif @serialize_as == "yaml"
                     @data_structure = YAML::load(to_obj)
                 else
                     raise "Unknown serialization method: #{@serialize_as}"
