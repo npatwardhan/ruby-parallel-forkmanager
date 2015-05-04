@@ -7,7 +7,7 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
     s.platform  =   Gem::Platform::RUBY
     s.name      =   "parallel-forkmanager"
-    s.version   =   "1.5.1"
+    s.version   =   "2.0.0"
     s.author    =   "Nathan Patwardhan"
     s.rubyforge_project = "parallelforkmgr"
     s.homepage  =   "http://rubyforge.org/projects/parallelforkmgr/"

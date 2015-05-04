@@ -101,6 +101,7 @@
 #
 # == Revision History
 #
+# - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.
 # - 1.5.1, 2011-03-04: Resolves bug [#29043] wait_one_child failed to retrieve object.  Adds conversion of Object to Hash before serialization to avoid 'singleton can't be dumped' error.  Minor documentation changes for initialize().
 # - 1.5.0, 2011-02-25: Implements data structure retrieval as had appeared in Perl Parallel::ForkManager 0.7.6.  Removes support for passing Proc to run_on_* methods; now supports blocks instead.  Documentation updates and code cleanup.
 # - 1.2.0, 2010-02-01: Resolves bug [#27748] finish throws an error when used with start(ident).  Adds block support to run_on_start(), run_on_wait(), run_on_finish().
@@ -355,6 +356,8 @@ class ForkManager
         @do_serialize = 0
         @serialize_as = nil
         @data_structure = nil
+        @auto_cleanup = (defined? @params['tempdir']) ? 1 : 0
+        @waitpid_blocking_sleep = 1
 
         # Make sure that @tempdir has a trailing slash.
         @tempdir <<= (@tempdir[(@tempdir.length-1)..-1] != "/") ? "/" : ""
@@ -478,7 +481,7 @@ class ForkManager
             raise "Cannot start another process while you are in the child process"
         end
 
-        while(@processes.length() >= @max_procs)
+        while(@max_procs && @processes.length() >= @max_procs)
             on_wait()
             arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
             wait_one_child(arg)
