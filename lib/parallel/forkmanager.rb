@@ -107,6 +107,7 @@
 #
 # == Revision History
 #
+# - 2.0.1, 2015-05-07: Minor doc fixes.  Fixes garbage collection.
 # - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.  May the 4th be with you.
 # - 1.5.1, 2011-03-04: Resolves bug [#29043] wait_one_child failed to retrieve object.  Adds conversion of Object to Hash before serialization to avoid 'singleton can't be dumped' error.  Minor documentation changes for initialize().
 # - 1.5.0, 2011-02-25: Implements data structure retrieval as had appeared in Perl Parallel::ForkManager 0.7.6.  Removes support for passing Proc to run_on_* methods; now supports blocks instead.  Documentation updates and code cleanup.
@@ -348,9 +349,6 @@ class ForkManager
 #
 
     def initialize(max_procs = 0, params = {})
-        # Appetite for Destruction.
-        ObjectSpace.define_finalizer(self, self.class.method(:finalizer))
-
         @max_procs = max_procs
         @processes = {}
         @do_on_finish = {}
@@ -390,7 +388,6 @@ class ForkManager
                 print "Temporary directory #{@tempdir} doesn't exist or is not a directory.\n"
                 exit 1
             end
-            @tempdir = @params['tempdir']
 
             #
             # Setup our serialization type.
@@ -403,11 +400,26 @@ class ForkManager
 
             @serialize_as = @serialize_as.downcase
         end
+
+        # Appetite for Destruction.
+        case RUBY_VERSION
+            when /^1\.[89]/, /^2\./
+                ObjectSpace.define_finalizer( self, self.class.finalize(@tempdir) )
+            else
+                raise "Unsupported Ruby version #{RUBY_VERSION}!"
+        end
+
     end
 
-    def self.finalizer()
-        #puts "this city is loaded with sluts!"
-        proc { $stderr.print "eh" }
+    def self.finalize(the_dir)
+        proc { 
+            Dir.foreach(the_dir) {
+                |file|
+                ds_file = "Parallel-ForkManager-#{@parent_pid}-"
+                next unless /^#{ds_file}/.match(file)
+                File.unlink("#{the_dir}/#{file}")
+            }
+        }
     end
 
 #
@@ -566,8 +578,9 @@ class ForkManager
 # dump() method.  This data structure is then retrieved from within the code
 # you send to the run_on_finish callback.
 #
-# NOTE NOTE NOTE: Only serialization with Marshal is supported at this time.
-# Future versions of Parallel::ForkManager <em>may</em> support expanded functionality!
+# NOTE NOTE NOTE: Only serialization with Marshal and yaml are supported at
+# this time.  Future versions of Parallel::ForkManager <em>may</em> support
+# expanded functionality!
 #
 # There are 2 steps involved in retrieving data structures:
 # 1. The data structure the child wishes to send back to the parent is provided as the second argument to the finish() call. It is up to the child to decide whether or not to send anything back to the parent.
@@ -737,11 +750,7 @@ class ForkManager
 # - core dump (1 if there was core dump at exit)
 # - data structure or nil (see Retrieving Data Structures)
 #
-# <em>NOTE NOTE NOTE: Passing Proc to run_on_finish will be deprecated in
-# Parallel::ForkManager 1.5!  Please use the form shown below now!</em>
-#
-# As of Parallel::ForkManager 1.2.0 run_on_finish supports a block argument
-# instead of needing to pass in a Proc explicitly.
+# As of Parallel::ForkManager 1.2.0 run_on_finish supports a block argument.
 #
 # Example:
 #
@@ -802,11 +811,7 @@ class ForkManager
 #
 # Example:
 #
-# <em>NOTE NOTE NOTE: Passing Proc to run_on_wait will be deprecated in
-# Parallel::ForkManager 1.5!  Please use the form shown below now!</em>
-#
-# As of Parallel::ForkManager 1.2.0 run_on_wait supports a block argument
-# instead of needing to pass in a Proc explicitly.
+# As of Parallel::ForkManager 1.2.0 run_on_wait supports a block argument.
 #
 # Example:
 #   period = 0.5
