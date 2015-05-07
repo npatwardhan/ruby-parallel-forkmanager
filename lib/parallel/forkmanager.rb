@@ -322,7 +322,7 @@ include Process
 module Parallel
 
 class ForkManager
-    VERSION = '2.0.0' # $Revision: 55 $
+    VERSION = '2.0.1' # $Revision: 55 $
 
 # new(max_procs, [params])
 #
