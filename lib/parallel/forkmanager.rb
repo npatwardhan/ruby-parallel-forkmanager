@@ -107,6 +107,7 @@
 #
 # == Revision History
 #
+# - 2.0.2, 2015-05-08: Fixes bug in garbage collection.
 # - 2.0.1, 2015-05-07: Minor doc fixes.  Fixes garbage collection.
 # - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.  May the 4th be with you.
 # - 1.5.1, 2011-03-04: Resolves bug [#29043] wait_one_child failed to retrieve object.  Adds conversion of Object to Hash before serialization to avoid 'singleton can't be dumped' error.  Minor documentation changes for initialize().
@@ -322,7 +323,7 @@ include Process
 module Parallel
 
 class ForkManager
-    VERSION = '2.0.1' # $Revision: 55 $
+    VERSION = '2.0.2'
 
 # new(max_procs, [params])
 #
@@ -404,18 +405,18 @@ class ForkManager
         # Appetite for Destruction.
         case RUBY_VERSION
             when /^1\.[89]/, /^2\./
-                ObjectSpace.define_finalizer( self, self.class.finalize(@tempdir) )
+                ObjectSpace.define_finalizer( self, self.class.finalize(@parent_pid, @tempdir) )
             else
                 raise "Unsupported Ruby version #{RUBY_VERSION}!"
         end
 
     end
 
-    def self.finalize(the_dir)
+    def self.finalize(the_ppid, the_dir)
         proc { 
             Dir.foreach(the_dir) {
                 |file|
-                ds_file = "Parallel-ForkManager-#{@parent_pid}-"
+                ds_file = "Parallel-ForkManager-#{@the_ppid}-"
                 next unless /^#{ds_file}/.match(file)
                 File.unlink("#{the_dir}/#{file}")
             }
