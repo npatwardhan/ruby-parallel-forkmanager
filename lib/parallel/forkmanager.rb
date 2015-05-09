@@ -317,6 +317,7 @@
 #   }
 #
 
+require 'pry'
 require 'tmpdir'
 include Process
 
@@ -505,7 +506,7 @@ class ForkManager
             raise "Cannot start another process while you are in the child process"
         end
 
-        while(@max_procs && @processes.length() >= @max_procs)
+        while(@max_procs.nonzero? && @processes.length() >= @max_procs)
             on_wait()
             arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
             wait_one_child(arg)
@@ -513,7 +514,7 @@ class ForkManager
 
         wait_children()
 
-        if @max_procs
+        if @max_procs.nonzero?
             if(block_given?)
                 raise "start(...) wrong number of args\n" if run_block.arity >= 0 && args.size != run_block.arity
                 @has_block = true
@@ -539,7 +540,7 @@ class ForkManager
             @processes[$$] = identification
             on_start($$, identification)
 
-            return 0
+            return nil
         end        
     end
 
