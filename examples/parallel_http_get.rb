@@ -5,11 +5,13 @@ require "net/http"
 # require 'forkmanager'
 require "lib/parallel/forkmanager.rb"
 
-base_pfm_version = "1.2.0"
+min_version = "1.2.0"
 
 if Parallel::ForkManager::VERSION < base_pfm_version
-  print "This script will only run under Parallel::ForkManager #{base_pfm_version} or newer!\n"
-  print "Please update your version of Parallel::ForkManager and try again!\n"
+  warn <<-ETX
+This script will only run under Parallel::ForkManager #{min_version} or newer!
+Please update your version of Parallel::ForkManager and try again!
+  ETX
   exit 1
 end
 
@@ -51,7 +53,7 @@ my_urls.each do |my_url|
     print "*** #{my_url}: #{e.message}!\n"
     pfm.finish(255)
     end # begin
-rescue Exception => e
+rescue StandardError => e
   print "Connection error: #{e.message}!\n"
   pfm.finish(255)
   end

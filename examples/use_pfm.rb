@@ -24,7 +24,7 @@ end
 
 items.each do |item|
   my_item = "nate-" + item.to_s
-  pid = pfm.start(my_item) and next
+  pfm.start(my_item) && next
   pfm.finish(23)
 end
 

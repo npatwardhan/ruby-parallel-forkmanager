@@ -1,9 +1,6 @@
 require "rubygems"
 require "rubygems/package_task"
 
-# $Id: Rakefile 52 2011-03-04 21:26:56Z nvp $
-# $Revision: 52 $
-
 spec = Gem::Specification.new do |s|
   s.platform  =   Gem::Platform::RUBY
   s.name      =   "parallel-forkmanager"
@@ -12,7 +9,9 @@ spec = Gem::Specification.new do |s|
   s.rubyforge_project = "parallelforkmgr"
   s.homepage  =   "https://github.com/npatwardhan/ruby-parallel-forkmanager/"
   s.email     =   "noopy.org<at>gmail.com"
-  s.description = "A simple parallel processing fork manager, based on the Perl module."
+  s.description = <<-ETX
+A simple parallel processing fork manager, based on the Perl module.
+  ETX
   s.license   =   "Ruby"
   s.summary   =   "A simple parallel processing fork manager."
 
