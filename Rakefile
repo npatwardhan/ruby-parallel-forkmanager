@@ -7,7 +7,7 @@ require 'rubygems/package_task'
 spec = Gem::Specification.new do |s|
     s.platform  =   Gem::Platform::RUBY
     s.name      =   "parallel-forkmanager"
-    s.version   =   "2.0.2"
+    s.version   =   "2.0.3"
     s.author    =   "Nathan Patwardhan"
     s.rubyforge_project = "parallelforkmgr"
     s.homepage  =   "https://github.com/npatwardhan/ruby-parallel-forkmanager/"

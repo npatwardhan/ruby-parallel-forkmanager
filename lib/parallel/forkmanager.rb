@@ -107,6 +107,7 @@
 #
 # == Revision History
 #
+# - 2.0.3, 2015-05-10: Start adding tests; switch to rubygems packaging.
 # - 2.0.2, 2015-05-08: Fixes bug in garbage collection.
 # - 2.0.1, 2015-05-07: Minor doc fixes.  Fixes garbage collection.
 # - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.  May the 4th be with you.
