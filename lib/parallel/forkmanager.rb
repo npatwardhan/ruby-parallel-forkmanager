@@ -309,11 +309,14 @@
 
 require "English"
 require "tmpdir"
-include Process
+
+require "parallel/process_interface"
 
 module Parallel
   class ForkManager
     VERSION = "2.0.3"
+
+    include Parallel::ProcessInterface
 
     # new(max_procs, [params])
     #
@@ -353,6 +356,7 @@ module Parallel
       @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
       @serialize_as = nil
       @data_structure = nil
+      @process_interface = params.fetch("process_interface", Parallel::ProcessInterface::Instance.new)
 
       # Make sure that @tempdir has a trailing slash.
       @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
@@ -409,6 +413,7 @@ module Parallel
         end
       end
     end
+
 
     #
     # start("string") -- "string" identification is optional.
@@ -504,10 +509,13 @@ module Parallel
         if block_given?
           fail "start(...) wrong number of args" if run_block.arity >= 0 && args.size != run_block.arity
           @has_block = true
-          pid = (!args.empty?) ? fork { run_block.call(*args); } : fork { run_block.call(); }
+          pid = (!args.empty?) ?
+            fork { run_block.call(*args); } :
+            fork { run_block.call(); }
         else
           fail "start(...) args given but block is empty!" unless args.empty?
 
+          # binding.pry
           pid = fork
         end
         fail "Cannot fork #{$ERROR_INFO}" unless defined? pid
@@ -662,7 +670,8 @@ module Parallel
           exit 1
         end
 
-        on_finish(kid, $CHILD_STATUS >> 8, id, $CHILD_STATUS & 0x7f, $CHILD_STATUS & 0x80 ? 1 : 0, the_retr_data)
+        status = child_status
+        on_finish(kid, status >> 8, id, status & 0x7f, status & 0x80 ? 1 : 0, the_retr_data)
         break
       end
 
