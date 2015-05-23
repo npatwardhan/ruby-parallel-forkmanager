@@ -107,6 +107,7 @@
 #
 # == Revision History
 #
+# - 2.0.5, 2015-05-23: Adds reap_finished_children, is_child and is_parent to match Perl PFM 1.14.
 # - 2.0.3, 2015-05-10: Start adding tests; switch to rubygems packaging.
 # - 2.0.2, 2015-05-08: Fixes bug in garbage collection.
 # - 2.0.1, 2015-05-07: Minor doc fixes.  Fixes garbage collection.
@@ -122,9 +123,9 @@
 # == Bugs and Limitations
 #
 # Parallel::ForkManager is a Ruby port of Perl Parallel::ForkManager
-# 1.12.  It was originally ported from Perl Parallel::ForkManager 0.7.5
+# 1.14.  It was originally ported from Perl Parallel::ForkManager 0.7.5
 # but was recently updated to integrate features implemented in Perl
-# Parallel::ForkManager versions 0.7.6 - 1.12.  Bug reports and feature
+# Parallel::ForkManager versions 0.7.6 - 1.14.  Bug reports and feature
 # requests are always welcome.
 #
 # Do not use Parallel::ForkManager in an environment where other child
@@ -325,7 +326,7 @@ include Process
 module Parallel
 
 class ForkManager
-    VERSION = '2.0.3'
+    VERSION = '2.0.5'
 
 # new(max_procs, [params])
 #
@@ -633,6 +634,12 @@ class ForkManager
         end
         return 0
     end
+
+# reap_finished_children() / wait_children()
+#
+# This is a non-blocking call to reap children and execute callbacks independent
+# of calls to "start" or "wait_all_children". Use this in scenarios where
+# "start" is called infrequently but you would like the callbacks executed quickly.
     
     def wait_children()
         return if @processes.keys().empty?
@@ -648,6 +655,7 @@ class ForkManager
     end
     
     alias :wait_childs :wait_children # compatibility
+    alias :reap_finished_children :wait_children; # behavioral synonym for clarity
 
 #
 # Probably won't want to call this directly.  Just let wait_all_children(...)
@@ -726,6 +734,24 @@ class ForkManager
     def running_procs()
         pids = @processes.keys()
         return pids
+    end
+
+#
+# is_parent()
+#
+# Returns true if within the parent or false if within the child.
+#
+    def is_parent()
+        !@in_child
+    end
+
+#
+# is_child()
+#
+# Returns true if within the child or false if within the parent.
+#
+    def is_child()
+        @in_child
     end
 
 #
@@ -948,7 +974,7 @@ class ForkManager
 
 #
 # waitpid_blocking_sleep() -- Returns the sleep period, in seconds, of the
-# pseudo-blockign calls.  Returns 0 if disabled.
+# pseudo-blocking calls.  The sleep period can be a fraction of a second.  Returns 0 if disabled.
 #
     def waitpid_blocking_sleep()
         return @waitpid_blocking_sleep
@@ -992,7 +1018,7 @@ class ForkManager
             pid = _waitpid_non_blocking()
             return pid if pid
 
-            sleep(sleep_period)
+            IO.select(nil, nil, nil, sleep_period)
         end
 
         return waitpid(-1, 0)
