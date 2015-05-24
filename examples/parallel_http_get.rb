@@ -7,7 +7,7 @@ require "lib/parallel/forkmanager.rb"
 
 min_version = "1.2.0"
 
-if Parallel::ForkManager::VERSION < base_pfm_version
+if Parallel::ForkManager::VERSION < min_version
   warn <<-ETX
 This script will only run under Parallel::ForkManager #{min_version} or newer!
 Please update your version of Parallel::ForkManager and try again!
