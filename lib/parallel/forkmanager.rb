@@ -722,7 +722,7 @@ module Parallel
     # Returns true if within the parent or false if within the child.
     #
     def is_parent()
-        !@in_child
+      !@in_child
     end
 
     #
@@ -731,7 +731,7 @@ module Parallel
     # Returns true if within the child or false if within the parent.
     #
     def is_child()
-        @in_child
+      @in_child
     end
 
     #
