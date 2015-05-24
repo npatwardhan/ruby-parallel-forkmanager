@@ -1,5 +1,9 @@
 # Parallel::ForkManager Changelog
 
+## 2.0.5 (2015-05-23)
+
+- Adds reap_finished_children, is_child and is_parent to match Perl PFM 1.14.
+
 ## 2.0.3 (2015-05-10)
 
 - Start adding tests

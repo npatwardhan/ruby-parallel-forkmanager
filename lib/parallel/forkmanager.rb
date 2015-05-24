@@ -111,9 +111,9 @@
 # == Bugs and Limitations
 #
 # Parallel::ForkManager is a Ruby port of Perl Parallel::ForkManager
-# 1.12.  It was originally ported from Perl Parallel::ForkManager 0.7.5
+# 1.14.  It was originally ported from Perl Parallel::ForkManager 0.7.5
 # but was recently updated to integrate features implemented in Perl
-# Parallel::ForkManager versions 0.7.6 - 1.12.  Bug reports and feature
+# Parallel::ForkManager versions 0.7.6 - 1.14.  Bug reports and feature
 # requests are always welcome.
 #
 # Do not use Parallel::ForkManager in an environment where other child
@@ -309,12 +309,11 @@
 
 require "English"
 require "tmpdir"
-
 require "parallel/process_interface"
 
 module Parallel
   class ForkManager
-    VERSION = "2.0.3"
+    VERSION = "2.0.5"
 
     include Parallel::ProcessInterface
 
@@ -622,6 +621,12 @@ module Parallel
       0
     end
 
+    # reap_finished_children() / wait_children()
+    #
+    # This is a non-blocking call to reap children and execute callbacks independent
+    # of calls to "start" or "wait_all_children". Use this in scenarios where
+    # "start" is called infrequently but you would like the callbacks executed quickly.
+
     def wait_children
       return if @processes.keys.empty?
 
@@ -636,6 +641,7 @@ module Parallel
     end
 
     alias_method :wait_childs, :wait_children # compatibility
+    alias_method :reap_finished_children, :wait_children; # behavioral synonym for clarity
 
     #
     # Probably won't want to call this directly.  Just let wait_all_children(...)
@@ -708,6 +714,24 @@ module Parallel
     #
     def running_procs
       @processes.keys
+    end
+
+    #
+    # is_parent()
+    #
+    # Returns true if within the parent or false if within the child.
+    #
+    def is_parent()
+        !@in_child
+    end
+
+    #
+    # is_child()
+    #
+    # Returns true if within the child or false if within the parent.
+    #
+    def is_child()
+        @in_child
     end
 
     #
@@ -961,6 +985,7 @@ module Parallel
         return pid if pid
 
         sleep(sleep_period)
+        IO.select(nil, nil, nil, sleep_period)
       end
 
       waitpid(-1, 0)
