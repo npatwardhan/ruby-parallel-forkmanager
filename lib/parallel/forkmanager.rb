@@ -341,6 +341,8 @@ module Parallel
     #
     #
     def initialize(max_procs = 0, params = {})
+      check_ruby_version
+
       @max_procs = max_procs
       @processes = {}
       @do_on_finish = {}
@@ -395,12 +397,7 @@ module Parallel
       end
 
       # Appetite for Destruction.
-      case RUBY_VERSION
-      when /^1\.[89]/, /^2\./
-        ObjectSpace.define_finalizer(self, self.class.finalize(@parent_pid, @tempdir))
-      else
-        fail "Unsupported Ruby version #{RUBY_VERSION}!"
-      end
+      ObjectSpace.define_finalizer(self, self.class.finalize(@parent_pid, @tempdir))
     end
 
     def self.finalize(_the_ppid, the_dir)
@@ -1071,5 +1068,19 @@ module Parallel
     private :on_start, :on_finish, :on_wait
     private :_waitpid, :_waitpid_non_blocking, :_waitpid_blocking
     private :_serialize_data, :_unserialize_data
+
+    private
+
+    # We care about the Ruby version for a couple of reasons:
+    #
+    # * The new lanmbda syntax -> (1.9 and above)
+    # * Finalizers (1.8 and above)
+    #
+    # So we only allow Ruby 1.9.* and 2.*
+    def check_ruby_version
+      return if RUBY_VERSION.start_with?("1.9")
+      return if RUBY_VERSION.start_with?("2.")
+      fail "Unsupported Ruby version #{RUBY_VERSION}!"
+    end
   end # class
 end # module
