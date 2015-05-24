@@ -985,7 +985,6 @@ module Parallel
         return pid if pid
 
         sleep(sleep_period)
-        IO.select(nil, nil, nil, sleep_period)
       end
 
       waitpid(-1, 0)
