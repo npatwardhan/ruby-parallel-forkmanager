@@ -311,14 +311,14 @@ require "English"
 require "tmpdir"
 require "yaml"
 
-require_relative "process_interface"
+require_relative "forkmanager/process_interface"
 require_relative "forkmanager/serializer"
 
 module Parallel
   class ForkManager
     VERSION = "2.0.5"
 
-    include Parallel::ProcessInterface
+    include Parallel::ForkManager::ProcessInterface
 
     # new(max_procs, [params])
     #
@@ -361,7 +361,7 @@ module Parallel
       @tempdir = (@params.key?("tempdir")) ? @params["tempdir"] : Dir.tmpdir
       @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
       @data_structure = nil
-      @process_interface = params.fetch("process_interface", Parallel::ProcessInterface::Instance.new)
+      @process_interface = params.fetch("process_interface", ProcessInterface::Instance.new)
 
       # Make sure that @tempdir has a trailing slash.
       @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
