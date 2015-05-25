@@ -1,3 +1,6 @@
+# For now we don't mind long lines...
+# rubocop:disable Metrics/LineLength
+#
 # = Parallel::ForkManager -- A simple parallel processing fork manager.
 #
 # == Copyright (c) 2008 - 2015 Nathan Patwardhan
@@ -90,35 +93,20 @@
 #  
 #  pm.wait_all_children
 #  
-# First you need to instantiate the ForkManager with the "new" constructor. 
-# You must specify the maximum number of processes to be created. If you 
+# First you need to instantiate the ForkManager with the "new" constructor.
+# You must specify the maximum number of processes to be created. If you
 # specify 0, then NO fork will be done; this is good for debugging purposes.
 #
-# Next, use pm.start() to do the fork. pfm returns 0 for the child process, 
+# Next, use pm.start() to do the fork. pfm returns 0 for the child process,
 # and child pid for the parent process.  The "and next" skips the internal
 # loop in the parent process.  NOTE: pm.start() dies if the fork fails.
 #
 # pm.finish() terminates the child process (assuming a fork was done in the
 # "start").
 #
-# NOTE: You cannot use pm.start() if you are already in the child process. 
-# If you want to manage another set of subprocesses in the child process, 
+# NOTE: You cannot use pm.start() if you are already in the child process.
+# If you want to manage another set of subprocesses in the child process,
 # you must instantiate another Parallel::ForkManager object!
-#
-# == Revision History
-#
-# - 2.0.5, 2015-05-23: Adds reap_finished_children, is_child and is_parent to match Perl PFM 1.14.
-# - 2.0.3, 2015-05-10: Start adding tests; switch to rubygems packaging.
-# - 2.0.2, 2015-05-08: Fixes bug in garbage collection.
-# - 2.0.1, 2015-05-07: Minor doc fixes.  Fixes garbage collection.
-# - 2.0.0, 2015-05-04: Refresh to match changes to Perl PFM 1.12.  May the 4th be with you.
-# - 1.5.1, 2011-03-04: Resolves bug [#29043] wait_one_child failed to retrieve object.  Adds conversion of Object to Hash before serialization to avoid 'singleton can't be dumped' error.  Minor documentation changes for initialize().
-# - 1.5.0, 2011-02-25: Implements data structure retrieval as had appeared in Perl Parallel::ForkManager 0.7.6.  Removes support for passing Proc to run_on_* methods; now supports blocks instead.  Documentation updates and code cleanup.
-# - 1.2.0, 2010-02-01: Resolves bug [#27748] finish throws an error when used with start(ident).  Adds block support to run_on_start(), run_on_wait(), run_on_finish().
-# - 1.1.1, 2010-01-05: Resolves bug with Errno::ECHILD.
-# - 1.1.0, 2010-01-01: Resolves bug [#27661] forkmanager doesn't fork!.  Adds block support to start() w/doc changes for same.
-# - 1.0.1, 2009-10-24: Resolves bug [#27328] dies with max procs 1.
-# - 1.0.0, 2008-11-03: Initial release.
 #
 # == Bugs and Limitations
 #
@@ -319,789 +307,717 @@
 #   }
 #
 
-require 'pry'
-require 'tmpdir'
-include Process
+require "English"
+require "tmpdir"
+require "yaml"
+
+require_relative "forkmanager/process_interface"
+require_relative "forkmanager/serializer"
 
 module Parallel
+  class ForkManager
+    VERSION = "2.0.5"
 
-class ForkManager
-    VERSION = '2.0.5'
+    include Parallel::ForkManager::ProcessInterface
 
-# new(max_procs, [params])
-#
-# Instantiate a Parallel::ForkManager object. You must specify the maximum
-# number of children to fork off. If you specify 0 (zero), then no children
-# will be forked.  This is intended for debugging purposes.
-#
-# The optional second parameter, params, is only used if you want to customize
-# the behavior that children will use to send back some data (see Retrieving
-# Data Structures below) to the parent.  The following values are currently
-# accepted for params (and their meanings):
-# - params['tempdir'] represents the location of the temporary directory where serialized data structures will be stored.
-# - params['serialize_as'] represents how the data will be serialized.
-#
-# If params has not been provided, the following values are set:
-# - @debug is set to non-zero to provide debugging messages.  Default is 0.
-# - @tempdir is set to Dir.tmpdir() (likely defaults to /tmp).
-# - @serialize_as is set to 'marshal' or 'yaml'.  Default is 'marshal'.
-#
-# NOTE NOTE NOTE: If you set tempdir to a directory that does not exist,
-# Parallel::ForkManager will <em>not</em> create this directory for you
-# and new() will exit!
-#
-#
-
+    # new(max_procs, [params])
+    #
+    # Instantiate a Parallel::ForkManager object. You must specify the maximum
+    # number of children to fork off. If you specify 0 (zero), then no children
+    # will be forked.  This is intended for debugging purposes.
+    #
+    # The optional second parameter, params, is only used if you want to customize
+    # the behavior that children will use to send back some data (see Retrieving
+    # Data Structures below) to the parent.  The following values are currently
+    # accepted for params (and their meanings):
+    # - params['tempdir'] represents the location of the temporary directory where serialized data structures will be stored.
+    # - params['serialize_as'] represents how the data will be serialized.
+    #
+    # XXX: Not quite true at the moment, debug is set to 0 if no params are
+    # provided, and the serialization isn't set.
+    #
+    # If params has not been provided, the following values are set:
+    # - @debug is set to non-zero to provide debugging messages.  Default is 0.
+    # - @tempdir is set to Dir.tmpdir() (likely defaults to /tmp).
+    #
+    # NOTE NOTE NOTE: If you set tempdir to a directory that does not exist,
+    # Parallel::ForkManager will <em>not</em> create this directory for you
+    # and new() will exit!
+    #
+    #
     def initialize(max_procs = 0, params = {})
-        @max_procs = max_procs
-        @processes = {}
-        @do_on_finish = {}
-        @in_child = false
-        @has_block = false
-        @on_wait_period = nil
-	@parent_pid = $$
-        @waitpid_blocking_sleep = 1
-        @params = params
-        @debug = (defined? @params['debug']) ? @params['debug'] : 0
-        @tempdir = (@params.has_key?('tempdir')) ? @params['tempdir'] : Dir.tmpdir()
-        @auto_cleanup = (defined? @params['tempdir']) ? 1 : 0
-        @serialize_as = nil
-        @data_structure = nil
+      check_ruby_version
 
-        # Make sure that @tempdir has a trailing slash.
-        @tempdir <<= (@tempdir[(@tempdir.length-1)..-1] != "/") ? "/" : ""
-        
-        # Always provide debug information if our max processes are zero!
-        if @max_procs.zero?
-            print "Zero processes have been specified so we will not fork and will proceed in debug mode!\n"
-            @debug = 1
-        end
-        
-        if @debug == 1
-            print "in initialize #{max_procs}!\n"
-            print "Will use tempdir #{@tempdir}\n"
-        end
-        
-        if @params.keys.length > 0
-            if !defined? @tempdir
-                print "params missing required argument: tempdir!"
-                exit 1
-            end
-           
-            if ! File.directory? @tempdir
-                print "Temporary directory #{@tempdir} doesn't exist or is not a directory.\n"
-                exit 1
-            end
+      @max_procs = max_procs
+      @processes = {}
+      @do_on_finish = {}
+      @in_child = false
+      @has_block = false
+      @on_wait_period = nil
+      @parent_pid = $PID
+      @waitpid_blocking_sleep = 1
+      @params = params
+      @debug = (defined? @params["debug"]) ? @params["debug"] : 0
+      @tempdir = (@params.key?("tempdir")) ? @params["tempdir"] : Dir.tmpdir
+      @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
+      @data_structure = nil
+      @process_interface = params.fetch("process_interface", ProcessInterface::Instance.new)
 
-            #
-            # Setup our serialization type.
-            #
-            if params.has_key?("serialize_as") or params.has_key?("serialize_type")
-                @serialize_as = (params.has_key?("serialize_as")) ? params['serialize_as'] : params['serialize_type']
-            else
-                @serialize_as = 'marshal'
-            end
+      # Make sure that @tempdir has a trailing slash.
+      @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
 
-            @serialize_as = @serialize_as.downcase
+      # Always provide debug information if our max processes are zero!
+      if @max_procs.zero?
+        puts "Zero processes have been specified so we will not fork and will proceed in debug mode!"
+        @debug = 1
+      end
+
+      if @debug == 1
+        puts "in initialize #{max_procs}!"
+        puts "Will use tempdir #{@tempdir}"
+      end
+
+      if @params.keys.length > 0
+        unless defined? @tempdir
+          puts "params missing required argument: tempdir!"
+          exit 1
         end
 
-        # Appetite for Destruction.
-        case RUBY_VERSION
-            when /^1\.[89]/, /^2\./
-                ObjectSpace.define_finalizer( self, self.class.finalize(@parent_pid, @tempdir) )
-            else
-                raise "Unsupported Ruby version #{RUBY_VERSION}!"
+        unless File.directory? @tempdir
+          puts "Temporary directory #{@tempdir} doesn't exist or is not a directory."
+          exit 1
         end
 
+        @serializer = Parallel::ForkManager::Serializer.new(
+          params["serialize_as"] || params["serialize_type"] || "marshal"
+        )
+      end
+
+      # Appetite for Destruction.
+      ObjectSpace.define_finalizer(self, self.class.finalize(@parent_pid, @tempdir))
     end
 
-    def self.finalize(the_ppid, the_dir)
-        proc { 
-            Dir.foreach(the_dir) {
-                |file|
-                ds_file = "Parallel-ForkManager-#{@the_ppid}-"
-                next unless /^#{ds_file}/.match(file)
-                File.unlink("#{the_dir}/#{file}")
-            }
-        }
+    def self.finalize(_the_ppid, the_dir)
+      proc do
+        Dir.foreach(the_dir) do |file|
+          ds_file = "Parallel-ForkManager-#{@the_ppid}-"
+          next unless /^#{ds_file}/.match(file)
+          File.unlink("#{the_dir}/#{file}")
+        end
+      end
     end
 
-#
-# start("string") -- "string" identification is optional.
-#
-# start("string") "puts the fork in Parallel::ForkManager" -- as start() does
-# the fork().  start() returns the pid of the child process for the parent,
-# and 0 for the child process.  If you set the 'processes' parameter for the
-# constructor to 0, then, assuming you're in the child process, pm.start()
-# simply returns 0.
-#
-# start("string") takes an optional "string" argument to use as a process
-# identifier.  It is used by the "run_on_finish" callback for identifying
-# the finished process.  See run_on_finish() for more information.
-#
-# For example:
-#
-#   my_ident = "webwacker-1.0"
-#   pm.start(my_ident)
-#
-# start("string") { block } takes an optional block parameter
-# that tells the ForkManager to follow Ruby fork() semantics for blocks.
-# For example:
-#
-#   my_ident = "webwacker-1.0"
-#   pm.start(my_ident) {
-#       print "As easy as "
-#       [1,2,3].each {
-#           |i|
-#           print i, "... "
-#       }
-#   }
-#
-# start("string", arg1, arg2, ... , argN) { block } requires a block parameter
-# that tells the ForkManager to follow Ruby fork() semantics for blocks.  Like
-# start("string"), "string" is an optional argument to use as a process
-# identifier and is used by the "run_on_finish" callback for identifying
-# the finished process.  For example:
-#
-#   my_ident = "webwacker-1.0"
-#   pm.start(my_ident, 1, 2, 3) {
-#       |*my_args|
-#       unless my_args.empty?
-#           print "As easy as "
-#           my_args.each {
-#               |i|
-#               print i, "... "
-#           }
-#       end
-#   }
-#
-# <em>NOTE NOTE NOTE: when you use start("string") with an optional block
-# parameter, the code in your block <em>must</em> explicitly exit non-zero
-# if you are using callbacks with the ForkManager (e.g. run_on_finish).</em>
-# This is because fork(), when run with a block parameter, terminates the
-# subprocess with a status of 0 by default.  If your block fails to exit
-# non-zero, *all* of your exit_code(s) will be zero regardless of any value
-# you might have passed to finish(...).
-#
-# To accommodate this behavior of fork and blocks, you can do
-# something like the following:
-#
-#   my_urls = [ ... some list of urls here ... ]
-#   my_ident = "webwacker-1.0"
-#
-#   my_urls.each {
-#       |my_url|
-#       pm.start(my_ident) {
-#           my_status = get_some_url(my_url)
-#           if my_status.to_i == 200
-#               exit 0
-#           else
-#               exit 255
-#       }
-#   }
-#
-#   ... etc ...
-#
 
-    def start(identification=nil, *args, &run_block)
-        if @in_child
-            raise "Cannot start another process while you are in the child process"
-        end
+    #
+    # start("string") -- "string" identification is optional.
+    #
+    # start("string") "puts the fork in Parallel::ForkManager" -- as start() does
+    # the fork().  start() returns the pid of the child process for the parent,
+    # and 0 for the child process.  If you set the 'processes' parameter for the
+    # constructor to 0, then, assuming you're in the child process, pm.start()
+    # simply returns 0.
+    #
+    # start("string") takes an optional "string" argument to use as a process
+    # identifier.  It is used by the "run_on_finish" callback for identifying
+    # the finished process.  See run_on_finish() for more information.
+    #
+    # For example:
+    #
+    #   my_ident = "webwacker-1.0"
+    #   pm.start(my_ident)
+    #
+    # start("string") { block } takes an optional block parameter
+    # that tells the ForkManager to follow Ruby fork() semantics for blocks.
+    # For example:
+    #
+    #   my_ident = "webwacker-1.0"
+    #   pm.start(my_ident) {
+    #       print "As easy as "
+    #       [1,2,3].each {
+    #           |i|
+    #           print i, "... "
+    #       }
+    #   }
+    #
+    # start("string", arg1, arg2, ... , argN) { block } requires a block parameter
+    # that tells the ForkManager to follow Ruby fork() semantics for blocks.  Like
+    # start("string"), "string" is an optional argument to use as a process
+    # identifier and is used by the "run_on_finish" callback for identifying
+    # the finished process.  For example:
+    #
+    #   my_ident = "webwacker-1.0"
+    #   pm.start(my_ident, 1, 2, 3) {
+    #       |*my_args|
+    #       unless my_args.empty?
+    #           print "As easy as "
+    #           my_args.each {
+    #               |i|
+    #               print i, "... "
+    #           }
+    #       end
+    #   }
+    #
+    # <em>NOTE NOTE NOTE: when you use start("string") with an optional block
+    # parameter, the code in your block <em>must</em> explicitly exit non-zero
+    # if you are using callbacks with the ForkManager (e.g. run_on_finish).</em>
+    # This is because fork(), when run with a block parameter, terminates the
+    # subprocess with a status of 0 by default.  If your block fails to exit
+    # non-zero, *all* of your exit_code(s) will be zero regardless of any value
+    # you might have passed to finish(...).
+    #
+    # To accommodate this behavior of fork and blocks, you can do
+    # something like the following:
+    #
+    #   my_urls = [ ... some list of urls here ... ]
+    #   my_ident = "webwacker-1.0"
+    #
+    #   my_urls.each {
+    #       |my_url|
+    #       pm.start(my_ident) {
+    #           my_status = get_some_url(my_url)
+    #           if my_status.to_i == 200
+    #               exit 0
+    #           else
+    #               exit 255
+    #       }
+    #   }
+    #
+    #   ... etc ...
+    #
 
-        while(@max_procs.nonzero? && @processes.length() >= @max_procs)
-            on_wait()
-            arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
-            wait_one_child(arg)
-        end
+    def start(identification = nil, *args, &run_block)
+      if @in_child
+        fail "Cannot start another process while you are in the child process"
+      end
 
-        wait_children()
+      while @max_procs.nonzero? && @processes.length >= @max_procs
+        on_wait
+        arg = (defined? @on_wait_period && !@on_wait_period.nil?) ? Process::WNOHANG : nil
+        wait_one_child(arg)
+      end
 
-        if @max_procs.nonzero?
-            if(block_given?)
-                raise "start(...) wrong number of args\n" if run_block.arity >= 0 && args.size != run_block.arity
-                @has_block = true
-                pid = (! args.empty?) ? fork { run_block.call(*args); } : fork { run_block.call(); }
-            else
-                if !args.empty?
-                    raise "start(...) args given but block is empty!\n"
-                end
+      wait_children
 
-                pid = fork()
-            end
-            raise "Cannot fork #{$!}\n" if ! defined? pid
-
-            if pid.nil?
-                @in_child = true
-            else
-                @processes[pid] = identification
-                on_start(pid, identification)
-            end
-
-            return pid
+      if @max_procs.nonzero?
+        if block_given?
+          fail "start(...) wrong number of args" if run_block.arity >= 0 && args.size != run_block.arity
+          @has_block = true
+          pid = (!args.empty?) ?
+            fork { run_block.call(*args); } :
+            fork { run_block.call(); }
         else
-            @processes[$$] = identification
-            on_start($$, identification)
+          fail "start(...) args given but block is empty!" unless args.empty?
 
-            return nil
-        end        
+          pid = fork
+        end
+        fail "Cannot fork #{$ERROR_INFO}" unless defined? pid
+
+        if pid.nil?
+          @in_child = true
+        else
+          @processes[pid] = identification
+          on_start(pid, identification)
+        end
+
+        return pid
+      else
+        @processes[$PID] = identification
+        on_start($PID, identification)
+
+        return nil
+      end
     end
 
-#
-# finish(exit_code, [data_structure]) -- exit_code is optional
-#
-# finish() closes the child process by exiting and accepts an optional exit
-# code (default exit code is 0) which can be retrieved in the parent via
-# callback.  If you're running the program in debug mode (max_proc == 0),
-# this method just calls the callback.
-#
-# If <em>data_structure</em> is provided, then <em>data structure</em> is
-# serialized and passed to the parent process. See <em>Retrieving Data
-# Structures</em> in the next section for more info.  For example:
-#
-#    %w{Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry}.each {
-#        |person|
-#        # pm.start(...) here
-#
-#        # ... etc ...
-#
-#        # Pass along data structure to finish().
-#        pm.finish(0, {'person' => person})
-#    }
-#
-#
-# === Retrieving Data Structures
-#
-# The ability for the parent to retrieve data structures from child processes
-# was adapted to Parallel::ForkManager 1.5.0 (and newer) from Perl Parallel::ForkManager.
-# This functionality was originally introduced in Perl Parallel::ForkManager
-# 0.7.6.
-#
-# Each child process may optionally send 1 data structure back to the parent.
-# By data structure, we mean a a string, hash, or array. The contents of the
-# data structure are written out to temporary files on disk using the Marshal
-# dump() method.  This data structure is then retrieved from within the code
-# you send to the run_on_finish callback.
-#
-# NOTE NOTE NOTE: Only serialization with Marshal and yaml are supported at
-# this time.  Future versions of Parallel::ForkManager <em>may</em> support
-# expanded functionality!
-#
-# There are 2 steps involved in retrieving data structures:
-# 1. The data structure the child wishes to send back to the parent is provided as the second argument to the finish() call. It is up to the child to decide whether or not to send anything back to the parent.
-# 2. The data structure is retrieved using the callback provided in the run_on_finish() method.
-#
-# Data structure retrieval is <em>not</em> the same as returning a data
-# structure from a method call!  The data structure referenced by a given
-# child process is serialized and written out to a file in the type specified
-# earlier in serialize_as.  If serialize_as was not specified earlier, then
-# no serialization will be done.
-#
-# The file is subseqently read back into memory and a new data structure that
-# belongs to the parent process is created.  Therefore it is recommended that
-# you keep the returned structure small in size to mitigate any possible
-# performance penalties.
-#
+    #
+    # finish(exit_code, [data_structure]) -- exit_code is optional
+    #
+    # finish() closes the child process by exiting and accepts an optional exit
+    # code (default exit code is 0) which can be retrieved in the parent via
+    # callback.  If you're running the program in debug mode (max_proc == 0),
+    # this method just calls the callback.
+    #
+    # If <em>data_structure</em> is provided, then <em>data structure</em> is
+    # serialized and passed to the parent process. See <em>Retrieving Data
+    # Structures</em> in the next section for more info.  For example:
+    #
+    #    %w{Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry}.each {
+    #        |person|
+    #        # pm.start(...) here
+    #
+    #        # ... etc ...
+    #
+    #        # Pass along data structure to finish().
+    #        pm.finish(0, {'person' => person})
+    #    }
+    #
+    #
+    # === Retrieving Data Structures
+    #
+    # The ability for the parent to retrieve data structures from child processes
+    # was adapted to Parallel::ForkManager 1.5.0 (and newer) from Perl Parallel::ForkManager.
+    # This functionality was originally introduced in Perl Parallel::ForkManager
+    # 0.7.6.
+    #
+    # Each child process may optionally send 1 data structure back to the parent.
+    # By data structure, we mean a a string, hash, or array. The contents of the
+    # data structure are written out to temporary files on disk using the Marshal
+    # dump() method.  This data structure is then retrieved from within the code
+    # you send to the run_on_finish callback.
+    #
+    # NOTE NOTE NOTE: Only serialization with Marshal and yaml are supported at
+    # this time.  Future versions of Parallel::ForkManager <em>may</em> support
+    # expanded functionality!
+    #
+    # There are 2 steps involved in retrieving data structures:
+    # 1. The data structure the child wishes to send back to the parent is provided as the second argument to the finish() call. It is up to the child to decide whether or not to send anything back to the parent.
+    # 2. The data structure is retrieved using the callback provided in the run_on_finish() method.
+    #
+    # Data structure retrieval is <em>not</em> the same as returning a data
+    # structure from a method call!  The data structure referenced by a given
+    # child process is serialized and written out to a file in the type specified
+    # earlier in serialize_as.  If serialize_as was not specified earlier, then
+    # no serialization will be done.
+    #
+    # The file is subseqently read back into memory and a new data structure that
+    # belongs to the parent process is created.  Therefore it is recommended that
+    # you keep the returned structure small in size to mitigate any possible
+    # performance penalties.
+    #
     def finish(exit_code = 0, data_structure = nil)
-        if @has_block
-            raise "Do not use finish(...) when using blocks.  Use an explicit exit in your block instead!\n"
+      if @has_block
+        fail "Do not use finish(...) when using blocks.  Use an explicit exit in your block instead!\n"
+      end
+
+      if @in_child
+        exit_code ||= 0
+
+        unless data_structure.nil?
+          @data_structure = data_structure
+
+          the_tempfile = "#{@tempdir}Parallel-ForkManager-#{@parent_pid}-#{$PID}.txt"
+
+          begin
+            fail "Unable to serialize data!" unless _serialize_data(the_tempfile)
+          rescue => e
+            puts "Unable to store #{the_tempfile}: #{e.message}"
+            exit 1
+          end
         end
 
-        if @in_child
-            exit_code ||= 0
+        Kernel.exit!(exit_code)
+      end
 
-            if !data_structure.nil?
-                @data_structure = data_structure
-
-                the_tempfile = @tempdir
-                the_tempfile = "#{@tempdir}Parallel-ForkManager-#{@parent_pid.to_s}-#{$$.to_s}.txt"
-                
-                begin
-                    if !_serialize_data(the_tempfile)
-                        raise "Unable to serialize data!\n"
-                    end
-                rescue => e
-                    print "Unable to store #{the_tempfile}: #{e.message}\n"
-                    exit 1
-                end
-            end
-
-            Kernel.exit!(exit_code)
-        end
-
-        if @max_procs == 0
-            on_finish($$, exit_code, @processes[$$], 0, 0)
-            @processes.delete($$)
-        end
-        return 0
+      if @max_procs == 0
+        on_finish($PID, exit_code, @processes[$PID], 0, 0)
+        @processes.delete($PID)
+      end
+      0
     end
 
-# reap_finished_children() / wait_children()
-#
-# This is a non-blocking call to reap children and execute callbacks independent
-# of calls to "start" or "wait_all_children". Use this in scenarios where
-# "start" is called infrequently but you would like the callbacks executed quickly.
-    
-    def wait_children()
-        return if @processes.keys().empty?
+    # reap_finished_children() / wait_children()
+    #
+    # This is a non-blocking call to reap children and execute callbacks independent
+    # of calls to "start" or "wait_all_children". Use this in scenarios where
+    # "start" is called infrequently but you would like the callbacks executed quickly.
 
-        kid = nil
+    def wait_children
+      return if @processes.keys.empty?
+
+      kid = nil
+      begin
         begin
-            begin
-                kid = wait_one_child(Process::WNOHANG)
-                end while kid > 0 || kid < -1
-        rescue Errno::ECHILD
-            return
-        end
+          kid = wait_one_child(Process::WNOHANG)
+        end while kid > 0 || kid < -1
+      rescue Errno::ECHILD
+        return
+      end
     end
-    
-    alias :wait_childs :wait_children # compatibility
-    alias :reap_finished_children :wait_children; # behavioral synonym for clarity
 
-#
-# Probably won't want to call this directly.  Just let wait_all_children(...)
-# make the call for you.
-#
+    alias_method :wait_childs, :wait_children # compatibility
+    alias_method :reap_finished_children, :wait_children; # behavioral synonym for clarity
+
+    #
+    # Probably won't want to call this directly.  Just let wait_all_children(...)
+    # make the call for you.
+    #
     def wait_one_child(par)
-        params = par || 0
+      params = par || 0
 
-        kid = nil
-        while true
-            kid = _waitpid(-1, params)
-            break if kid == nil or kid == 0 or kid == -1 # Win32 returns negative PIDs
-            redo if ! @processes.has_key?(kid)
-            id = @processes.delete(kid)
+      kid = nil
+      loop do
+        kid = _waitpid(-1, params)
+        break if kid.nil? || kid == 0 || kid == -1 # Win32 returns negative PIDs
+        redo unless @processes.key?(kid)
+        id = @processes.delete(kid)
 
-            # Retrieve child data structure, if any.            
-            the_retr_data = {}
-            the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$$.to_s}-#{kid.to_s}.txt"
-            
-            begin
-                if File.exists?(the_tempfile) and ! File.zero?(the_tempfile)
-                    if ! _unserialize_data(the_tempfile)
-                        raise "Unable to unserialize data!\n"
-                    end
+        # Retrieve child data structure, if any.
+        the_retr_data = {}
+        the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$PID}-#{kid}.txt"
 
-                    the_retr_data = @data_structure
-                end
-
-                if File.exists?(the_tempfile)
-                    File.unlink(the_tempfile)
-                end
-            rescue => e
-                print "wait_one_child failed to retrieve object: #{e.message}\n"
-                exit 1
-            end
-
-            on_finish(kid, $? >> 8, id, $? & 0x7f, $? & 0x80 ? 1 : 0, the_retr_data)
-            break
-        end
-
-        kid ||= 0
-        kid
-    end
-
-#
-# wait_all_children() will wait for all the processes which have been 
-# forked. This is a blocking wait.
-#
-    def wait_all_children()
         begin
-            while ! @processes.keys().empty?
-                on_wait()
-                arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
-                wait_one_child(arg)
-            end
-        rescue Errno::ECHILD
-            return
-        end
-    end
-    
-    alias :wait_all_childs :wait_all_children # compatibility
-
-#
-# max_procs() -- Returns the maximal number of processes the object will fork.
-#
-    def max_procs()
-        return @max_procs
-    end
-
-#
-# running_procs() -- Returns the pids of the forked processes currently
-# monitored by the Parallel::ForkManager.  Note that children are still
-# reports as running until the fork manager will harvest them, via the
-# next call to start(...) or wait_all_children().
-#
-    def running_procs()
-        pids = @processes.keys()
-        return pids
-    end
-
-#
-# is_parent()
-#
-# Returns true if within the parent or false if within the child.
-#
-    def is_parent()
-        !@in_child
-    end
-
-#
-# is_child()
-#
-# Returns true if within the child or false if within the parent.
-#
-    def is_child()
-        @in_child
-    end
-
-#
-# wait_for_available_procs(nbr) -- Wait until 'n' available process slots
-# are available.  If 'n' is not given, defaults to I.
-#
-    def wait_for_available_procs(nbr)
-        nbr ||= 1
-
-        raise "Number processes '#{nbr}' higher than then max number of processes: #{@max_procs}" if nbr > max_procs()
-
-        wait_one_child until (max_procs() - running_procs()) >= nbr
-    end
-
-#
-# You can define run_on_finish(...) that is called when a child in the parent
-# process when a child is terminated.
-#
-# The parameters of run_on_finish(...) are:
-#
-# - pid of the process, which is terminated
-# - exit code of the program
-# - identification of the process (if provided in the "start" method)
-# - exit signal (0-127: signal name)
-# - core dump (1 if there was core dump at exit)
-# - data structure or nil (see Retrieving Data Structures)
-#
-# As of Parallel::ForkManager 1.2.0 run_on_finish supports a block argument.
-#
-# Example:
-#
-#   pm.run_on_finish {
-#           |pid,exit_code,ident|
-#           print "** PID (#{pid}) for #{ident} exited with code #{exit_code}!\n"
-#   }
-#
-    def run_on_finish(code=nil, pid=0, &my_block)
-        begin
-            if !code.nil? && !my_block.nil?
-                raise "run_on_finish: code and block are mutually exclusive options!"
+          if File.exist?(the_tempfile) && !File.zero?(the_tempfile)
+            unless _unserialize_data(the_tempfile)
+              fail "Unable to unserialize data!"
             end
 
-            if ! code.nil?
-                if code.class.to_s == "Proc" and VERSION >= "1.5.0"
-                    print "Passing Proc has been deprecated as of Parallel::ForkManager #{VERSION}!\nPlease refer to rdoc about how to change your code!\n"
-                end
-                @do_on_finish[pid] = code
-            elsif !my_block.nil?
-                @do_on_finish[pid] = my_block
-            end
-        rescue TypeError => e
-            raise e.message
-        end
-    end
+            the_retr_data = @data_structure
+          end
 
-#
-# on_finish is a private method and should not be called directly.
-#
-    def on_finish(*params)
-        pid = params[0]
-        code = @do_on_finish[pid] || @do_on_finish[0] or return 0
-        begin
-            my_argc = code.arity - 1
-            if my_argc > 0
-                my_params = params[0 .. my_argc]
-            else
-                my_params = [params[0]]
-            end
-            params = my_params
-            code.call(*params)
+          File.unlink(the_tempfile) if File.exist?(the_tempfile)
         rescue => e
-            raise "on finish failed: #{e.message}!\n"
+          print "wait_one_child failed to retrieve object: #{e.message}\n"
+          exit 1
         end
+
+        status = child_status
+        on_finish(kid, status >> 8, id, status & 0x7f, status & 0x80 ? 1 : 0, the_retr_data)
+        break
+      end
+
+      kid ||= 0
+      kid
     end
 
-#
-# You can define a subroutine which is called when the child process needs
-# to wait for the startup. If period is not defined, then one call is done per
-# child. If period is defined, then code is called periodically and the
-# method waits for "period" seconds betwen the two calls. Note, period can be
-# fractional number also. The exact "period seconds" is not guaranteed,
-# signals can shorten and the process scheduler can make it longer (i.e. on
-# busy systems).
-#
-# No parameters are passed to code on the call.
-#
-# Example:
-#
-# As of Parallel::ForkManager 1.2.0 run_on_wait supports a block argument.
-#
-# Example:
-#   period = 0.5
-#   pm.run_on_wait(period) {
-#           print "** Have to wait for one child ...\n"
-#   }
-#
-#
+    #
+    # wait_all_children() will wait for all the processes which have been
+    # forked. This is a blocking wait.
+    #
+    def wait_all_children
+      until @processes.keys.empty?
+        on_wait
+        arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
+        wait_one_child(arg)
+      end
+    rescue Errno::ECHILD
+      # do nothing.
+    end
+
+    alias_method :wait_all_childs, :wait_all_children # compatibility
+
+    #
+    # max_procs() -- Returns the maximal number of processes the object will fork.
+    #
+    attr_reader :max_procs
+
+    #
+    # running_procs() -- Returns the pids of the forked processes currently
+    # monitored by the Parallel::ForkManager.  Note that children are still
+    # reports as running until the fork manager will harvest them, via the
+    # next call to start(...) or wait_all_children().
+    #
+    def running_procs
+      @processes.keys
+    end
+
+    #
+    # is_parent()
+    #
+    # Returns true if within the parent or false if within the child.
+    #
+    def is_parent()
+      !@in_child
+    end
+
+    #
+    # is_child()
+    #
+    # Returns true if within the child or false if within the parent.
+    #
+    def is_child()
+      @in_child
+    end
+
+    #
+    # wait_for_available_procs(nbr) -- Wait until 'n' available process slots
+    # are available.  If 'n' is not given, defaults to I.
+    #
+    def wait_for_available_procs(nbr)
+      nbr ||= 1
+
+      fail "Number processes '#{nbr}' higher than then max number of processes: #{@max_procs}" if nbr > max_procs
+
+      wait_one_child until (max_procs - running_procs) >= nbr
+    end
+
+    #
+    # You can define run_on_finish(...) that is called when a child in the parent
+    # process when a child is terminated.
+    #
+    # The parameters of run_on_finish(...) are:
+    #
+    # - pid of the process, which is terminated
+    # - exit code of the program
+    # - identification of the process (if provided in the "start" method)
+    # - exit signal (0-127: signal name)
+    # - core dump (1 if there was core dump at exit)
+    # - data structure or nil (see Retrieving Data Structures)
+    #
+    # As of Parallel::ForkManager 1.2.0 run_on_finish supports a block argument.
+    #
+    # Example:
+    #
+    #   pm.run_on_finish {
+    #           |pid,exit_code,ident|
+    #           print "** PID (#{pid}) for #{ident} exited with code #{exit_code}!\n"
+    #   }
+    #
+    def run_on_finish(code = nil, pid = 0, &my_block)
+      if !code.nil? && !my_block.nil?
+        fail "run_on_finish: code and block are mutually exclusive options!"
+      end
+
+      if !code.nil?
+        if code.class.to_s == "Proc" && VERSION >= "1.5.0"
+          print "Passing Proc has been deprecated as of Parallel::ForkManager #{VERSION}!\nPlease refer to rdoc about how to change your code!\n"
+        end
+        @do_on_finish[pid] = code
+      elsif !my_block.nil?
+        @do_on_finish[pid] = my_block
+      end
+    rescue TypeError => e
+      raise e.message
+    end
+
+    #
+    # on_finish is a private method and should not be called directly.
+    #
+    def on_finish(*params)
+      pid = params[0]
+      code = @do_on_finish[pid] || @do_on_finish[0] or return 0
+      begin
+        my_argc = code.arity - 1
+        if my_argc > 0
+          my_params = params[0..my_argc]
+        else
+          my_params = [params[0]]
+        end
+        params = my_params
+        code.call(*params)
+      rescue => e
+        raise "on finish failed: #{e.message}!\n"
+      end
+    end
+
+    #
+    # You can define a subroutine which is called when the child process needs
+    # to wait for the startup. If period is not defined, then one call is done per
+    # child. If period is defined, then code is called periodically and the
+    # method waits for "period" seconds betwen the two calls. Note, period can be
+    # fractional number also. The exact "period seconds" is not guaranteed,
+    # signals can shorten and the process scheduler can make it longer (i.e. on
+    # busy systems).
+    #
+    # No parameters are passed to code on the call.
+    #
+    # Example:
+    #
+    # As of Parallel::ForkManager 1.2.0 run_on_wait supports a block argument.
+    #
+    # Example:
+    #   period = 0.5
+    #   pm.run_on_wait(period) {
+    #           print "** Have to wait for one child ...\n"
+    #   }
+    #
+    #
 
     def run_on_wait(*params, &block)
-        begin
-            raise "period is required by run_on_wait\n" if !params.length
+      fail "period is required by run_on_wait" unless params.length
 
-            if params.length == 1
-                period = params[0]
-                raise "period must be of type float!\n" if period.class.to_s.downcase() != "float"
-            elsif params.length == 2
-                code, period = params
-                raise "run_on_wait: Missing or invalid code block!\n" if code.class.to_s.downcase() != "proc"
-            else
-                raise "run_on_wait: Invalid argument count!\n"
-            end
+      if params.length == 1
+        period = params[0]
+        fail "period must be of type float!" if period.class.to_s.downcase != "float"
+      elsif params.length == 2
+        code, period = params
+        fail "run_on_wait: Missing or invalid code block!" if code.class.to_s.downcase != "proc"
+      else
+        fail "run_on_wait: Invalid argument count!"
+      end
 
-            @on_wait_period = period
-            raise "Wait period must be greater than 0.0!\n" if period == 0
+      @on_wait_period = period
+      fail "Wait period must be greater than 0.0!\n" if period == 0
 
-            if ! code.nil? && ! block.nil?
-                raise "run_on_wait: code and block are mutually exclusive arguments!"
-            end
+      if !code.nil? && !block.nil?
+        fail "run_on_wait: code and block are mutually exclusive arguments!"
+      end
 
-            if ! code.nil?
-                if code.class.to_s == "Proc" and VERSION >= "1.5.0"
-                    print "Passing Proc has been deprecated as of Parallel::ForkManager #{VERSION}!\nPlease refer to rdoc about how to change your code!\n"
-                end
-
-                @do_on_wait = code
-            elsif !block.nil?
-                @do_on_wait = block
-            end
-        rescue TypeError
-            raise "run on wait failed!\n"
+      if !code.nil?
+        if code.class.to_s == "Proc" && VERSION >= "1.5.0"
+          puts "Passing Proc has been deprecated as of Parallel::ForkManager #{VERSION}!\nPlease refer to rdoc about how to change your code!"
         end
+
+        @do_on_wait = code
+      elsif !block.nil?
+        @do_on_wait = block
+      end
+    rescue TypeError
+      raise "run on wait failed!"
     end
 
-#
-# on_wait is a private method as it should not be called directly.
-#
-    def on_wait()
-        begin
-            if @do_on_wait.class().name == 'Proc'
-                @do_on_wait.call()
-                if defined? @on_wait_period and !@on_wait_period.nil?
-                    #
-                    # Unfortunately Ruby 1.8 has no concept of 'sigaction',
-                    # so we're unable to check if a signal handler has
-                    # already been installed for a given signal.  In this
-                    # case it's no matter, since we define handler, but yikes.
-                    #
-                    Signal.trap("CHLD") do
-                        lambda{}.call() if Signal.list["CHLD"].nil?
-                    end
-                    IO.select(nil, nil, nil, @on_wait_period)
-                end
-            end
-        end
+    #
+    # on_wait is a private method as it should not be called directly.
+    #
+    def on_wait
+      return unless @do_on_wait.class.name == "Proc"
+
+      @do_on_wait.call
+      return unless defined? @on_wait_period && !@on_wait_period.nil?
+      #
+      # Unfortunately Ruby 1.8 has no concept of 'sigaction',
+      # so we're unable to check if a signal handler has
+      # already been installed for a given signal.  In this
+      # case it's no matter, since we define handler, but yikes.
+      #
+      Signal.trap("CHLD") do
+        -> {}.call if Signal.list["CHLD"].nil?
+      end
+      IO.select(nil, nil, nil, @on_wait_period)
     end
 
-#
-# You can define a subroutine which is called when a child is started. It is
-# called after a successful startup of a child in the parent process.
-#
-# The parameters of code are as follows:
-# - pid of the process which has been started
-# - identification of the process (if provided in the "start" method)
-#
-# You can pass a block to run_on_start.
-#
-# Example:
-#
-#   pm.run_on_start() {
-#           |pid,ident|
-#           print "run on start ::: #{ident} (#{pid})\n"
-#       }
-#
-#
+    #
+    # You can define a subroutine which is called when a child is started. It is
+    # called after a successful startup of a child in the parent process.
+    #
+    # The parameters of code are as follows:
+    # - pid of the process which has been started
+    # - identification of the process (if provided in the "start" method)
+    #
+    # You can pass a block to run_on_start.
+    #
+    # Example:
+    #
+    #   pm.run_on_start() {
+    #           |pid,ident|
+    #           print "run on start ::: #{ident} (#{pid})\n"
+    #       }
+    #
+    #
     def run_on_start(&block)
-        begin
-            if !block.nil?
-                @do_on_start = block
-            end
-        rescue TypeError
-            raise "run on start failed!\n"
-        end
+      @do_on_start = block unless block.nil?
+    rescue TypeError
+      raise "run on start failed!\n"
     end
 
-#
-# on_start() is a private method as it should not be called directly.
-#
+    #
+    # on_start() is a private method as it should not be called directly.
+    #
     def on_start(*params)
-        begin
-            if @do_on_start.class().name == 'Proc'
-                my_argc = @do_on_start.arity - 1
-                if my_argc > 0
-                    my_params = params[0 .. my_argc]    
-                else
-                    my_params = params[0]
-                end
-                params = my_params
-                @do_on_start.call(*params)
-            end
-        rescue
-            raise "on_start failed\n"
-        end       
+      if @do_on_start.class.name == "Proc"
+        my_argc = @do_on_start.arity - 1
+        if my_argc > 0
+          my_params = params[0..my_argc]
+        else
+          my_params = params[0]
+        end
+        params = my_params
+        @do_on_start.call(*params)
+      end
+    rescue
+      raise "on_start failed"
     end
 
-#
-# set_max_procs() allows you to set a new maximum number of children
-# to maintain.
-#
+    #
+    # set_max_procs() allows you to set a new maximum number of children
+    # to maintain.
+    #
     def set_max_procs(mp=nil)
-        @max_procs = mp
+      @max_procs = mp
     end
 
-#
-# set_wait_pid_blocking_sleep(seconds) -- Sets the sleep period,
-# in seconds, of the pseudo-blocking calls.  Set to 0 to disable.
-#
+    #
+    # set_wait_pid_blocking_sleep(seconds) -- Sets the sleep period,
+    # in seconds, of the pseudo-blocking calls.  Set to 0 to disable.
+    #
     def set_waitpid_blocking_sleep(period)
-        @waitpid_blocking_sleep = period
+      @waitpid_blocking_sleep = period
     end
 
-#
-# waitpid_blocking_sleep() -- Returns the sleep period, in seconds, of the
-# pseudo-blocking calls.  The sleep period can be a fraction of a second.  Returns 0 if disabled.
-#
-    def waitpid_blocking_sleep()
-        return @waitpid_blocking_sleep
+    #
+    # waitpid_blocking_sleep() -- Returns the sleep period, in seconds, of the
+    # pseudo-blockign calls.  Returns 0 if disabled.
+    #
+    def waitpid_blocking_sleep
+      @waitpid_blocking_sleep
     end
 
-#
-# _waitpid(...) is a private method as it should not be called directly.
-# It is called automatically by wait_one_child(...).
-#
-    def _waitpid(pid, flag)
-        return flag ? _waitpid_non_blocking() : _waitpid_blocking()
+    #
+    # _waitpid(...) is a private method as it should not be called directly.
+    # It is called automatically by wait_one_child(...).
+    #
+    def _waitpid(_pid, flag)
+      flag ? _waitpid_non_blocking : _waitpid_blocking
     end
 
-#
-# Private method used internally by _waitpid(...).
-#
-    def _waitpid_non_blocking()
-        running_procs().each {
-            |pid|
-            p = waitpid(pid, Process::WNOHANG) or next
-            if p == -1
-                warn "Child process #{pid} disappeared.  A call to 'waitpid' outside of Parallel::ForkManager might have reaped it."
-                # It's gone.  Let's clean the process entry.
-                @processes.delete[pid]
-            else
-                return pid
-            end
-        }
-
-        return 0
-    end
-
-#
-# Private method used internally by _waitpid(...).  Simulates a blocking
-# waitpid(...) call.
-#
-    def _waitpid_blocking()
-        # pseudo-blocking
-        sleep_period = @waitpid_blocking_sleep
-        while true do
-            pid = _waitpid_non_blocking()
-            return pid if pid
-
-            IO.select(nil, nil, nil, sleep_period)
+    #
+    # Private method used internally by _waitpid(...).
+    #
+    def _waitpid_non_blocking
+      running_procs.each do |pid|
+        p = waitpid(pid, Process::WNOHANG) || next
+        if p == -1
+          warn "Child process #{pid} disappeared.  A call to 'waitpid' outside of Parallel::ForkManager might have reaped it."
+          # It's gone.  Let's clean the process entry.
+          @processes.delete[pid]
+        else
+          return pid
         end
+      end
 
-        return waitpid(-1, 0)
+      0
     end
 
-#
-# _serialize_data is a private method and should not be called directly.
-#
-# Currently supports Marshal.dump() and YAML to serialize data.
-#
+    #
+    # Private method used internally by _waitpid(...).  Simulates a blocking
+    # waitpid(...) call.
+    #
+    def _waitpid_blocking
+      # pseudo-blocking
+      sleep_period = @waitpid_blocking_sleep
+      loop do
+        pid = _waitpid_non_blocking
+        return pid if pid
+
+        sleep(sleep_period)
+      end
+
+      waitpid(-1, 0)
+    end
+
+    #
+    # _serialize_data is a private method and should not be called directly.
+    #
+    # Currently supports Marshal.dump() and YAML to serialize data.
+    #
     def _serialize_data(store_tempfile)
-        retval = 0
+      return 1 if @serializer.nil?
 
-        if @serialize_as.nil?
-            retval = 1
-        else
-            begin
-                f = File.new(store_tempfile, "wb")
+      File.open(store_tempfile, "wb") do |f|
+        f.write(@serializer.serialize(@data_structure.to_hash))
+      end
+      return 1
 
-                if @serialize_as == "marshal"
-                    obj = Marshal.dump(@data_structure.to_hash)
-                elsif @serialize_as == "yaml"
-                    obj = YAML::dump(@data_structure)
-                else
-                    raise "Unknown serialization method: #{@serialize_as}"
-                end
-
-                f.write(obj)
-                f.close()
-
-                retval = 1
-            rescue => e
-                raise "Error writing #{store_tempfile}: #{e.message}"
-            end
-        end
-
-        return retval
+    rescue => e
+      raise "Error writing/serializing #{store_tempfile}: #{e.message}"
     end
 
-#
-# _unserialize_data is a private method and should not be called directly.
-#
-# Currently only supports Marshal.load() to unserialize data.
-#
+    #
+    # _unserialize_data is a private method and should not be called directly.
+    #
+    # Currently only supports Marshal.load() to unserialize data.
+    #
     def _unserialize_data(store_tempfile)
-        retval = 0
+      return 1 if @serializer.nil?
 
-        if @serialize_as.nil?
-            retval = 1
-        else
-            begin
-                to_obj = String.new()
+      data = File.binread(store_tempfile)
+      @data_structure = @serializer.deserialize(data)
+      return 1
 
-                f = File.new(store_tempfile, "rb")
-            
-                f.readlines.each {
-                    |line|
-                    to_obj << line
-                }
-            
-                f.close()
-
-                if @serialize_as == "marshal"
-                    @data_structure = Marshal.load(to_obj)
-                elsif @serialize_as == "yaml"
-                    @data_structure = YAML::load(to_obj)
-                else
-                    raise "Unknown serialization method: #{@serialize_as}"
-                end
-
-                retval = 1
-            rescue => e
-                raise "Error reading #{store_tempfile}: #{e.message}"
-                # Clean up temp file if it exists.
-                # Otherwise we'll have a bunch of 'em laying around.
-                #
-                if File.exists?(store_tempfile)
-                    File.unlink(store_tempfile)
-                end
-            end
-        end
-
-        return retval
+    rescue => e
+      # Clean up temp file if it exists.
+      # Otherwise we'll have a bunch of 'em laying around.
+      #
+      File.unlink(store_tempfile) rescue nil # XXX: supress errors from unlink.
+      raise "Error reading/deserializing #{store_tempfile}: #{e.message}"
     end
 
     # private methods
@@ -1109,6 +1025,18 @@ class ForkManager
     private :_waitpid, :_waitpid_non_blocking, :_waitpid_blocking
     private :_serialize_data, :_unserialize_data
 
-end # class
+    private
 
+    # We care about the Ruby version for a couple of reasons:
+    #
+    # * The new lanmbda syntax -> (1.9 and above)
+    # * Finalizers (1.8 and above)
+    #
+    # So we only allow Ruby 1.9.* and 2.*
+    def check_ruby_version
+      return if RUBY_VERSION.start_with?("1.9")
+      return if RUBY_VERSION.start_with?("2.")
+      fail "Unsupported Ruby version #{RUBY_VERSION}!"
+    end
+  end # class
 end # module
