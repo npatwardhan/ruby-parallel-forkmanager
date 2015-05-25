@@ -35,7 +35,10 @@ module TestParallelForkManager
       run_test(expected: {})
     end
 
-    def run_test(params: {}, expected: FINISH_DATA)
+    def run_test(args = {})
+      params = args.fetch(:params, {})
+      expected = args.fetch(:expected, FINISH_DATA)
+
       pfm = Parallel::ForkManager.new(1, params)
       returned_ds = nil
       pfm.run_on_finish do |pid, exit_code, ident, exit_signal, core_dump, ds|

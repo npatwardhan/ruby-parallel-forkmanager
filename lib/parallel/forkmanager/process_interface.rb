@@ -15,9 +15,10 @@ module Parallel
       private :process_interface
 
       # Not quite sure why fork can't be delegated successfully.
-      private def fork(*args, &block)
+      def fork(*args, &block)
         process_interface.fork(*args, &block)
       end
+      private :fork
 
       def_delegators :@process_interface, :child_status, :waitpid
       private :child_status, :waitpid
