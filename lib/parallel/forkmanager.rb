@@ -309,7 +309,10 @@
 
 require "English"
 require "tmpdir"
-require "parallel/process_interface"
+require "yaml"
+
+require_relative "process_interface"
+require_relative "forkmanager/serializer"
 
 module Parallel
   class ForkManager
@@ -330,10 +333,12 @@ module Parallel
     # - params['tempdir'] represents the location of the temporary directory where serialized data structures will be stored.
     # - params['serialize_as'] represents how the data will be serialized.
     #
+    # XXX: Not quite true at the moment, debug is set to 0 if no params are
+    # provided, and the serialization isn't set.
+    #
     # If params has not been provided, the following values are set:
     # - @debug is set to non-zero to provide debugging messages.  Default is 0.
     # - @tempdir is set to Dir.tmpdir() (likely defaults to /tmp).
-    # - @serialize_as is set to 'marshal' or 'yaml'.  Default is 'marshal'.
     #
     # NOTE NOTE NOTE: If you set tempdir to a directory that does not exist,
     # Parallel::ForkManager will <em>not</em> create this directory for you
@@ -355,7 +360,6 @@ module Parallel
       @debug = (defined? @params["debug"]) ? @params["debug"] : 0
       @tempdir = (@params.key?("tempdir")) ? @params["tempdir"] : Dir.tmpdir
       @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
-      @serialize_as = nil
       @data_structure = nil
       @process_interface = params.fetch("process_interface", Parallel::ProcessInterface::Instance.new)
 
@@ -384,16 +388,9 @@ module Parallel
           exit 1
         end
 
-        #
-        # Setup our serialization type.
-        #
-        if params.key?("serialize_as") || params.key?("serialize_type")
-          @serialize_as = (params.key?("serialize_as")) ? params["serialize_as"] : params["serialize_type"]
-        else
-          @serialize_as = "marshal"
-        end
-
-        @serialize_as = @serialize_as.downcase
+        @serializer = Parallel::ForkManager::Serializer.new(
+          params["serialize_as"] || params["serialize_type"] || "marshal"
+        )
       end
 
       # Appetite for Destruction.
@@ -511,7 +508,6 @@ module Parallel
         else
           fail "start(...) args given but block is empty!" unless args.empty?
 
-          # binding.pry
           pid = fork
         end
         fail "Cannot fork #{$ERROR_INFO}" unless defined? pid
@@ -993,32 +989,15 @@ module Parallel
     # Currently supports Marshal.dump() and YAML to serialize data.
     #
     def _serialize_data(store_tempfile)
-      retval = 0
+      return 1 if @serializer.nil?
 
-      if @serialize_as.nil?
-        retval = 1
-      else
-        begin
-          f = File.new(store_tempfile, "wb")
-
-          if @serialize_as == "marshal"
-            obj = Marshal.dump(@data_structure.to_hash)
-          elsif @serialize_as == "yaml"
-            obj = YAML.dump(@data_structure)
-          else
-            fail "Unknown serialization method: #{@serialize_as}"
-          end
-
-          f.write(obj)
-          f.close
-
-          retval = 1
-        rescue => e
-          raise "Error writing #{store_tempfile}: #{e.message}"
-        end
+      File.open(store_tempfile, "wb") do |f|
+        f.write(@serializer.serialize(@data_structure.to_hash))
       end
+      return 1
 
-      retval
+    rescue => e
+      raise "Error writing/serializing #{store_tempfile}: #{e.message}"
     end
 
     #
@@ -1027,41 +1006,18 @@ module Parallel
     # Currently only supports Marshal.load() to unserialize data.
     #
     def _unserialize_data(store_tempfile)
-      retval = 0
+      return 1 if @serializer.nil?
 
-      if @serialize_as.nil?
-        retval = 1
-      else
-        begin
-          to_obj = ""
+      data = File.binread(store_tempfile)
+      @data_structure = @serializer.deserialize(data)
+      return 1
 
-          f = File.new(store_tempfile, "rb")
-
-          f.readlines.each do |line|
-            to_obj << line
-          end
-
-          f.close
-
-          if @serialize_as == "marshal"
-            @data_structure = Marshal.load(to_obj)
-          elsif @serialize_as == "yaml"
-            @data_structure = YAML.load(to_obj)
-          else
-            fail "Unknown serialization method: #{@serialize_as}"
-          end
-
-          retval = 1
-        rescue => e
-          raise "Error reading #{store_tempfile}: #{e.message}"
-          # Clean up temp file if it exists.
-          # Otherwise we'll have a bunch of 'em laying around.
-          #
-          File.unlink(store_tempfile) if File.exist?(store_tempfile)
-        end
-      end
-
-      retval
+    rescue => e
+      # Clean up temp file if it exists.
+      # Otherwise we'll have a bunch of 'em laying around.
+      #
+      File.unlink(store_tempfile) rescue nil # XXX: supress errors from unlink.
+      raise "Error reading/deserializing #{store_tempfile}: #{e.message}"
     end
 
     # private methods
