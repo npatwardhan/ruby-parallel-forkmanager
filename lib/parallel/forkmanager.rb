@@ -651,7 +651,7 @@ module Parallel
         id = @processes.delete(kid)
 
         # Retrieve child data structure, if any.
-        the_retr_data = {}
+        the_retr_data = nil
         the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$PID}-#{kid}.txt"
 
         begin
@@ -992,7 +992,7 @@ module Parallel
       return 1 if @serializer.nil?
 
       File.open(store_tempfile, "wb") do |f|
-        f.write(@serializer.serialize(@data_structure.to_hash))
+        f.write(@serializer.serialize(@data_structure))
       end
       return 1
 
