@@ -1,8 +1,7 @@
 #!/usr/bin/env ruby
 
 require "rubygems"
-# require 'forkmanager'
-require "lib/parallel/forkmanager"
+require "parallel/forkmanager"
 
 max_procs = 5
 pfm = Parallel::ForkManager.new(max_procs)
