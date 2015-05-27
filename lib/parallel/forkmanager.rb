@@ -311,13 +311,12 @@ require "English"
 require "tmpdir"
 require "yaml"
 
+require_relative "forkmanager/version"
 require_relative "forkmanager/process_interface"
 require_relative "forkmanager/serializer"
 
 module Parallel
   class ForkManager
-    VERSION = "2.0.5"
-
     include Parallel::ForkManager::ProcessInterface
 
     # new(max_procs, [params])

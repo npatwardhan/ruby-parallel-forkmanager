@@ -1,0 +1,5 @@
+module Parallel
+  class ForkManager
+    VERSION = "2.0.5"
+  end
+end
