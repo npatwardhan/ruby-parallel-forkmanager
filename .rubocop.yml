@@ -1,3 +1,17 @@
 ---
 Style/StringLiterals:
   EnforcedStyle: double_quotes
+Style/Documentation:
+  # Lots of files under lib/parallel/forkmanager/ start with
+  #
+  # module Parallel
+  #   class ForkManager
+  #     ...
+  #
+  # which wants a comment before the class ForkManager to keep rubocop
+  # happy.
+  #
+  # That should have been documented in lib/parallel/forkmanager.rb so this
+  # exlcude stops those warnings without littering the code with directives.
+  Exclude:
+  - "lib/parallel/forkmanager/**/*.rb"
