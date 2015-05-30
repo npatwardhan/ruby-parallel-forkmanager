@@ -12,6 +12,7 @@ require "yaml"
 require_relative "forkmanager/version"
 require_relative "forkmanager/process_interface"
 require_relative "forkmanager/serializer"
+require_relative "forkmanager/dummy_process_status"
 
 module Parallel
   class ForkManager
@@ -63,6 +64,10 @@ module Parallel
       # Make sure that @tempdir has a trailing slash.
       @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
 
+      @serializer = Parallel::ForkManager::Serializer.new(
+        params["serialize_as"] || params["serialize_type"] || "marshal"
+      )
+
       # Always provide debug information if our max processes are zero!
       if @max_procs.zero?
         puts "Zero processes have been specified so we will not fork and will proceed in debug mode!"
@@ -84,10 +89,6 @@ module Parallel
           puts "Temporary directory #{@tempdir} doesn't exist or is not a directory."
           exit 1
         end
-
-        @serializer = Parallel::ForkManager::Serializer.new(
-          params["serialize_as"] || params["serialize_type"] || "marshal"
-        )
       end
 
       # Appetite for Destruction.
@@ -183,9 +184,7 @@ module Parallel
     #
 
     def start(identification = nil, *args, &run_block)
-      if @in_child
-        fail "Cannot start another process while you are in the child process"
-      end
+      fail AttemptedStartInChildProcessError if in_child
 
       while @max_procs.nonzero? && @processes.length >= @max_procs
         on_wait
@@ -210,7 +209,7 @@ module Parallel
         fail "Cannot fork #{$ERROR_INFO}" unless defined? pid
 
         if pid.nil?
-          @in_child = true
+          self.in_child = true
         else
           @processes[pid] = identification
           on_start(pid, identification)
@@ -285,7 +284,7 @@ module Parallel
         fail "Do not use finish(...) when using blocks.  Use an explicit exit in your block instead!\n"
       end
 
-      if @in_child
+      if in_child
         exit_code ||= 0
 
         unless data_structure.nil?
@@ -367,7 +366,7 @@ module Parallel
         end
 
         status = child_status
-        on_finish(kid, status >> 8, id, status & 0x7f, status & 0x80 ? 1 : 0, the_retr_data)
+        on_finish(kid, status.exitstatus, id, status.stopsig, status.coredump?, the_retr_data)
         break
       end
 
@@ -412,7 +411,7 @@ module Parallel
     # Returns true if within the parent or false if within the child.
     #
     def is_parent()
-      !@in_child
+      !in_child
     end
 
     #
@@ -421,7 +420,7 @@ module Parallel
     # Returns true if within the child or false if within the parent.
     #
     def is_child()
-      @in_child
+      in_child
     end
 
     #
@@ -724,6 +723,7 @@ module Parallel
 
     private
 
+    attr_accessor :in_child
     # We care about the Ruby version for a couple of reasons:
     #
     # * The new lanmbda syntax -> (1.9 and above)

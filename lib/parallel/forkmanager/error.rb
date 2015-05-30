@@ -2,8 +2,10 @@ module Parallel
   class ForkManager
     # All of parallel forkmanager's internal errors should inherit from
     # Parallel::ForkManager::Error.
-    Error = Class.new(RuntimeError)
+    class Error < RuntimeError; end
 
-    UnknownSerializerError = Class.new(Error)
+    class UnknownSerializerError < Error; end
+    class MissingTempDirError < Error; end
+    class AttemptedStartInChildProcessError; end
   end
 end

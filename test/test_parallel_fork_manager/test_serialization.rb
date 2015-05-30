@@ -26,13 +26,7 @@ module TestParallelForkManager
     end
 
     def test_with_default_serializer
-      # It seems that the default serializer is only set up if there are other
-      # params passed into the constructor.
-      run_test(params: { "foo" => "bar" })
-
-      # If we run with no parmeters then the serializer isn't set up, so we get
-      # nil back.
-      run_test(expected: nil)
+      run_test
     end
 
     def test_non_hash_data_return

@@ -13,10 +13,10 @@ module TestParallelForkManager
 
       pi.expect(:fork,         PIDS[0])
       pi.expect(:waitpid,      PIDS[0], [PIDS[0], 1])
-      pi.expect(:child_status,       0)
+      pi.expect(:child_status, Parallel::ForkManager::DummyProcessStatus.new(0))
       pi.expect(:fork,         PIDS[1])
       pi.expect(:waitpid,      PIDS[1], [PIDS[1], 1])
-      pi.expect(:child_status,       0)
+      pi.expect(:child_status, Parallel::ForkManager::DummyProcessStatus.new(0))
 
       %w(one two).each do |item|
         pfm.start(item) && next
