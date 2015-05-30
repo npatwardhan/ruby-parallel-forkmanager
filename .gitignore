@@ -1,5 +1,6 @@
 /Gemfile.lock
 # packaging artifacts
 /pkg/
-# rdoc generated documentation
-/html/
+# yard documentation
+/doc/
+/.yardoc/

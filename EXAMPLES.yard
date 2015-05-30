@@ -13,13 +13,13 @@ The programs are discussed below.
 
 Example of a program using callbacks to get child exit codes.
 
-    :include: examples/callbacks.rb
+{include:file:examples/callbacks.rb}
 
 == data_structures_string.rb
 
 In this simple example, each child sends back a string.
 
-    :include: examples/data_structures_string.rb
+{include:file:examples/data_structures_string.rb}
 
 == data_structures_advanced.rb
 
@@ -27,14 +27,14 @@ A second data structure retrieval example demonstrates how children
 decide whether or not to send anything back, what to send and how the
 parent should process whatever is retrieved.
 
-    :include: examples/data_structures_advanced.rb
+{include:file:examples/data_structures_advanced.rb}
 
 == parallel_http_get.rb
 
 Use multiple workers to fetch data from URLs.
 
-    :include: examples/parallel_http_get.rb
+{include:file:examples/parallel_http_get.rb}
 
 == use_pfm.rb
 
-    :include: examples/use_pfm.rb
+{include:file:examples/use_pfm.rb}

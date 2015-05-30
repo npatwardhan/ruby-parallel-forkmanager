@@ -7,10 +7,18 @@ module Parallel
     # switching on type.  This is a "shameless green" if you use Sandi Metz's
     # terminology.
     class Serializer
-      def initialize(type = nil)
+      ##
+      # Raises a {Parallel::ForkManager::UnknownSerializerError} exception if
+      # +type+ isn't one of +marshal+ or +yaml+
+      #
+      # @param type [String] The type of serialization to use.
+      def initialize(type)
         @type = validate_type(type)
       end
 
+      ##
+      # @param data_structure [Object] the data to be serialized.
+      # @return [String] the serialized representation of the data.
       def serialize(data_structure)
         case type
         when :marshal
@@ -20,12 +28,15 @@ module Parallel
         end
       end
 
-      def deserialize(data)
+      ##
+      # @param serialized [String] the serialized representation of the data.
+      # @return [Object] the resonstituted data structure.
+      def deserialize(serialized)
         case type
         when :marshal
-          Marshal.load(data)
+          Marshal.load(serialized)
         when :yaml
-          YAML.load(data)
+          YAML.load(serialized)
         end
       end
 

@@ -28,6 +28,5 @@ A simple parallel processing fork manager, based on the Perl module.
   s.add_development_dependency "rake"     # , "~> 10.0"
   s.add_development_dependency "minitest"
   s.add_development_dependency "pry"
-
-  s.has_rdoc  =   true
+  s.add_development_dependency "yard"
 end

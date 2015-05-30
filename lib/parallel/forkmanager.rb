@@ -1,10 +1,3 @@
-# == Copyright (c) 2008 - 2015 Nathan Patwardhan
-#
-# All rights reserved. This program is free software; you can redistribute
-# it and/or modify it under the same terms as Ruby itself.
-#
-# == Author: Nathan Patwardhan <noopy.org@gmail.com>
-
 require "English"
 require "tmpdir"
 require "yaml"
@@ -14,12 +7,17 @@ require_relative "forkmanager/process_interface"
 require_relative "forkmanager/serializer"
 require_relative "forkmanager/dummy_process_status"
 
+##
+# This module provides a namespace.
 module Parallel
+  ##
+  # This class provides a higher level interface to +fork+, allowing you to
+  # limit the number of child processes spawned and it provides a mechanism for
+  # child processes to return data structures to the parent.
   class ForkManager
     include Parallel::ForkManager::ProcessInterface
 
-    # new(max_procs, [params])
-    #
+    ##
     # Instantiate a Parallel::ForkManager object. You must specify the maximum
     # number of children to fork off. If you specify 0 (zero), then no children
     # will be forked.  This is intended for debugging purposes.
@@ -42,73 +40,39 @@ module Parallel
     # Parallel::ForkManager will <em>not</em> create this directory for you
     # and new() will exit!
     #
-    #
+    # @param max_procs[Integer] maximum number of concurrent child processes.
+    # @param params[Hash] configuration parameters.
     def initialize(max_procs = 0, params = {})
       check_ruby_version
-
-      @max_procs = max_procs
-      @processes = {}
-      @do_on_finish = {}
-      @in_child = false
-      @has_block = false
-      @on_wait_period = nil
-      @parent_pid = $PID
-      @waitpid_blocking_sleep = 1
-      @params = params
-      @debug = (defined? @params["debug"]) ? @params["debug"] : 0
-      @tempdir = (@params.key?("tempdir")) ? @params["tempdir"] : Dir.tmpdir
-      @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
-      @data_structure = nil
-      @process_interface = params.fetch("process_interface", ProcessInterface::Instance.new)
-
-      # Make sure that @tempdir has a trailing slash.
-      @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
-
-      @serializer = Parallel::ForkManager::Serializer.new(
-        params["serialize_as"] || params["serialize_type"] || "marshal"
-      )
+      setup_instance_variables(max_procs, params)
 
       # Always provide debug information if our max processes are zero!
       if @max_procs.zero?
         puts "Zero processes have been specified so we will not fork and will proceed in debug mode!"
-        @debug = 1
-      end
-
-      if @debug == 1
         puts "in initialize #{max_procs}!"
         puts "Will use tempdir #{@tempdir}"
       end
 
-      if @params.keys.length > 0
-        unless defined? @tempdir
-          puts "params missing required argument: tempdir!"
-          exit 1
-        end
-
-        unless File.directory? @tempdir
-          puts "Temporary directory #{@tempdir} doesn't exist or is not a directory."
-          exit 1
-        end
-      end
-
       # Appetite for Destruction.
-      ObjectSpace.define_finalizer(self, self.class.finalize(@parent_pid, @tempdir))
+      ObjectSpace.define_finalizer(self, self.class._finalize)
     end
 
-    def self.finalize(_the_ppid, the_dir)
+    ##
+    # This finalizer is not meant to be called manually, it cleans up temporary
+    # files which were used to return serialized data from the children.
+    def self._finalize
       proc do
-        Dir.foreach(the_dir) do |file|
-          ds_file = "Parallel-ForkManager-#{@the_ppid}-"
-          next unless /^#{ds_file}/.match(file)
-          File.unlink("#{the_dir}/#{file}")
+        Dir.foreach(tempdir) do |file_name|
+          prefix = "Parallel-ForkManager-#{parent_pid}-"
+          next unless file_name.start_with prefix
+          File.unlink("#{tempdir}/#{file_name}")
         end
       end
     end
 
+    attr_reader :max_procs
 
-    #
-    # start("string") -- "string" identification is optional.
-    #
+    ##
     # start("string") "puts the fork in Parallel::ForkManager" -- as start() does
     # the fork().  start() returns the pid of the child process for the parent,
     # and 0 for the child process.  If you set the 'processes' parameter for the
@@ -723,7 +687,40 @@ module Parallel
 
     private
 
+    attr_reader :parent_pid
+    attr_reader :tempdir
     attr_accessor :in_child
+
+    def setup_instance_variables(max_procs, params)
+      @max_procs = max_procs
+
+      # TODO: remove this, it seems to be unused.
+      @debug = params.fetch("debug", false)
+
+      @tempdir = params.fetch("tempdir", Dir.tmpdir)
+      @tempdir += "/" unless @tempdir.end_with?("/")
+      unless File.directory? @tempdir
+        fail(MissingTempDirError,
+             "#{@tempdir} doesn't exist or is not a directory.")
+      end
+
+      @process_interface = params.fetch("process_interface",
+                                        ProcessInterface::Instance.new)
+
+      @data_structure = nil
+      @processes = {}
+      @do_on_finish = {}
+      @in_child = false
+      @has_block = false
+      @on_wait_period = nil
+      @parent_pid = $PID
+      @waitpid_blocking_sleep = 1
+
+      @serializer = Parallel::ForkManager::Serializer.new(
+        params["serialize_as"] || params["serialize_type"] || "marshal"
+      )
+    end
+
     # We care about the Ruby version for a couple of reasons:
     #
     # * The new lanmbda syntax -> (1.9 and above)
