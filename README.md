@@ -1,6 +1,6 @@
 # Parallel::ForkManager - A simple parallel processing fork manager.
 
-[![Build Status](https://travis-ci.org/mikestok/ruby-parallel-forkmanager.svg?branch#master)](https://travis-ci.org/mikestok/ruby-parallel-forkmanager)
+[![Build Status](https://travis-ci.org/npatwardhan/ruby-parallel-forkmanager.svg?branch#master)](https://travis-ci.org/npatwardhan/ruby-parallel-forkmanager)
 
 ## Overview
 
