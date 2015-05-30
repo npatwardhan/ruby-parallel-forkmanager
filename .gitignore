@@ -1,1 +1,6 @@
+/Gemfile.lock
+# packaging artifacts
 /pkg/
+# yard documentation
+/doc/
+/.yardoc/

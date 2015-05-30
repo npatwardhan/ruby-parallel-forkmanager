@@ -63,7 +63,8 @@ module TestParallelForkManager
         waitpid_return = running_pid == finished_pid ? finished_pid : nil
         pi.expect(:waitpid, waitpid_return, [running_pid, Process::WNOHANG])
       end
-      pi.expect(:child_status, return_code)
+      pi.expect(:child_status,
+                Parallel::ForkManager::DummyProcessStatus.new(return_code))
       running_pids.delete finished_pid
     end
 

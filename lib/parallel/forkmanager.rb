@@ -1,327 +1,23 @@
-# For now we don't mind long lines...
-# rubocop:disable Metrics/LineLength
-#
-# = Parallel::ForkManager -- A simple parallel processing fork manager.
-#
-# == Copyright (c) 2008 - 2015 Nathan Patwardhan
-#
-# All rights reserved. This program is free software; you can redistribute
-# it and/or modify it under the same terms as Ruby itself.
-#
-# == Author: Nathan Patwardhan <noopy.org@gmail.com>
-#
-# == Documentation
-#
-# Nathan Patwardhan <noopy.org@gmail.com>, based on Perl Parallel::ForkManager documentation by Noah Robin <sitz@onastick.net> and dLux <dlux@dlux.hu>.
-#
-# == Credits (Perl):
-#
-# - dLux <dlux@dlux.hu> (author, original Perl module)
-# - Gábor Szabó (szabgab@cpan.org)  (co-maintainer)
-# - Michael Gang (bug report)
-# - Noah Robin <sitz@onastick.net> (documentation tweaks)
-# - Chuck Hirstius <chirstius@megapathdsl.net> (callback exit status, original Perl example)
-# - Grant Hopwood <hopwoodg@valero.com> (win32 port)
-# - Mark Southern <mark_southern@merck.com> (bugfix)
-# - Ken Clarke <www.perlprogrammer.net>  (data structure retrieval)
-#
-# == Credits (Ruby):
-#
-# - Robert Klemme <shortcutter@googlemail.com>, David A. Black <dblack@rubypal.com>        (general awesomeness)
-# - Roger Pack <rogerdpack@gmail.com>          (bugfix, fork semantics in start, doc changes)
-# - Mike Stok <mike@stok.ca>          (test cases, percussion, backing vocals)
-#
-# == Overview
-#
-# Parallel::ForkManager is used for operations that you would like to do
-# in parallel.  Typical use is a downloader which could be retrieving
-# hundreds and/or thousands of files.
-#
-# Parallel::ForkManager, as its name suggests, uses fork() to handle parallel
-# processing instead of threads.  If you've used fork() before, you're aware
-# that you need to be responsible for managing (i.e. cleaning up) the
-# processes that were created as a result of the fork().
-#
-# Parallel::ForkManager handles this for you such that you start() and
-# finish() without having to worry about child processes along
-# the way.  Further, Parallel::ForkManager provides useful callbacks
-# that you can use when a child starts and/or finishes, or while you're
-# waiting for a child to complete.
-#
-# The code for a downloader that uses Net::HTTP would look like this:
-#
-#  require 'rubygems'
-#  require 'net/http'
-#  require 'forkmanager'
-#  
-#  my_urls = [
-#      'url1',
-#      'url2',
-#      'urlN'
-#  ]
-#  
-#  max_proc = 30
-#  my_timeout = 5
-#  
-#  pm = Parallel::ForkManager.new(max_proc)
-#  
-#  my_urls.each {
-#      |my_url|
-#  
-#      pm.start(my_url) and next # blocks until new fork slot is available
-#
-#      # doing stuff here with my_url will be in a child
-#      url = URI.parse(my_url)
-#
-#      begin
-#          http = Net::HTTP.new(url.host, url.port)
-#          http.open_timeout = http.read_timeout = my_timeout
-#          res = http.get(url.path)
-#
-#          status = res.code
-#          if status.to_i != 200
-#              print "Cannot get #{url.path} from #{url.host}!\n"
-#              pm.finish(255)
-#          else
-#              pm.finish(0)
-#          end
-#      rescue Timeout::Error, Errno::ECONNREFUSED => e
-#          print "*** ERROR: #{my_url}: #{e.message}!\n"
-#          pm.finish(255)
-#      end
-#  }
-#  
-#  pm.wait_all_children
-#  
-# First you need to instantiate the ForkManager with the "new" constructor.
-# You must specify the maximum number of processes to be created. If you
-# specify 0, then NO fork will be done; this is good for debugging purposes.
-#
-# Next, use pm.start() to do the fork. pfm returns 0 for the child process,
-# and child pid for the parent process.  The "and next" skips the internal
-# loop in the parent process.  NOTE: pm.start() dies if the fork fails.
-#
-# pm.finish() terminates the child process (assuming a fork was done in the
-# "start").
-#
-# NOTE: You cannot use pm.start() if you are already in the child process.
-# If you want to manage another set of subprocesses in the child process,
-# you must instantiate another Parallel::ForkManager object!
-#
-# == Bugs and Limitations
-#
-# Parallel::ForkManager is a Ruby port of Perl Parallel::ForkManager
-# 1.14.  It was originally ported from Perl Parallel::ForkManager 0.7.5
-# but was recently updated to integrate features implemented in Perl
-# Parallel::ForkManager versions 0.7.6 - 1.14.  Bug reports and feature
-# requests are always welcome.
-#
-# Do not use Parallel::ForkManager in an environment where other child
-# processes can affect the run of the main program, so using this module
-# is not recommended in an environment where fork() / wait() is already used.
-#
-# If you want to use more than one copy of the Parallel::ForkManager then
-# you have to make sure that all children processes are terminated -- before you
-# use the second object in the main program.
-#
-# You are free to use a new copy of Parallel::ForkManager in the child
-# processes, although I don't think it makes sense.
-#
-# == Examples
-#
-# === Callbacks
-#
-# Example of a program using callbacks to get child exit codes:
-#
-#  require 'rubygems'
-#  require 'forkmanager'
-#  
-#  max_procs = 5
-#  names = %w{ Fred Jim Lily Steve Jessica Bob Dave Christine Rico Sara }
-#
-#  pm = Parallel::ForkManager.new(max_procs)
-#
-#  # Setup a callback for when a child finishes up so we can get it's exit code
-#  pm.run_on_finish {
-#      |pid,exit_code,ident|
-#      print "** #{ident} just got out of the pool with PID #{pid} and exit code: #{exit_code}\n"
-#  }
-#
-#  pm.run_on_start {
-#      |pid,ident|
-#      print "** #{ident} started, pid: #{pid}\n"
-#  }
-#
-#  pm.run_on_wait(0.5) {
-#      print "** Have to wait for one children ...\n"
-#  }
-#
-#  names.each_index {
-#      |child|
-#      pid = pm.start(names[child]) and next
-#
-#      # This code is the child process
-#      print "This is #{names[child]}, Child number #{child}\n"
-#      sleep ( 2 * child )
-#      print "#{names[child]}, Child #{child} is about to get out...\n"
-#      sleep 1
-#      pm.finish(child) # pass an exit code to finish
-#  }
-#
-#  print "Waiting for Children...\n"
-#  pm.wait_all_children
-#  print "Everybody is out of the pool!\n"
-#
-# === Data structure retrieval
-#
-# In this simple example, each child sends back a string.
-#
-#  require 'rubygems'
-#  require 'forkmanager'
-#  
-#  max_procs = 2
-#  persons = %w{Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry}
-#
-#  pm = Parallel::ForkManager.new(max_procs, {'tempdir' => '/tmp'}, 0)
-#
-#  # data structure retrieval and handling
-#  pm.run_on_finish { # called BEFORE the first call to start()
-#      |pid,exit_code,ident,exit_signal,core_dump,data_structure|
-#
-#      # retrieve data structure from child
-#      if defined? data_structure # children are not forced to send anything
-#          str = data_structure # child passed a string
-#          print "#{str}\n"
-#      else  # problems occuring during storage or retrieval will throw a warning
-#          print "No message received from child process #{pid}!\n"
-#      end
-#  }
-#
-#  # prep random statement components
-#  foods = ['chocolate', 'ice cream', 'peanut butter', 'pickles', 'pizza', 'bacon', 'pancakes', 'spaghetti', 'cookies']
-#  preferences = ['loves', 'can\'t stand', 'always wants more', 'will walk 100 miles for', 'only eats', 'would starve rather than eat']
-#  
-#  # run the parallel processes
-#  persons.each {
-#      |person|
-#      pm.start() and next
-#
-#      # generate a random statement about food preferences
-#      pref_idx = preferences.index(preferences.sort_by{ rand }[0])
-#      food_idx = foods.index(foods.sort_by{ rand }[0])
-#      statement = "#{person} #{preferences[pref_idx]} #{foods[food_idx]}"
-#  
-#      # send it back to the parent process
-#      pm.finish(0, statement)
-#  }
-#
-#  pm.wait_all_children
-#
-#
-# A second data structure retrieval example demonstrates how children
-# decide whether or not to send anything back, what to send and how the
-# parent should process whatever is retrieved.
-#
-#  require 'rubygems'
-#  require 'forkmanager'
-#  
-#   max_procs = 20
-#   persons = %w{Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry}
-# 
-#   pm = Parallel::ForkManager.new(max_procs, {'tempdir' => '/tmp'}, 0)
-# 
-#   # data structure retrieval and handling
-#   retrieved_responses = {} # for collecting responses
-# 
-#   # data structure retrieval and handlin
-#   pm.run_on_finish { # called BEFORE the first call to start()
-#       |pid,exit_code,ident,exit_signal,core_dump,data_structure|
-# 
-#       # see what child sent us, if anything
-#       if defined? data_structure and !data_structure.empty? # test rather than assume child sent anything
-#           dsr = data_structure # child passed a string
-#           print "#{ident} returned a #{dsr}.\n\n"
-#           p dsr
-# 
-#           retrieved_responses[ident] = dsr
-#       else
-#           print "#{ident} did not send anything.\n\n"
-#       end
-#   }
-# 
-#   # generate a list of instructions
-#   instructions = [  # a unique identifier and what the child process should send
-#       {'name' => '%ENV keys as a string', 'send' => 'keys'},
-#       {'name' => 'Send Nothing'},  # not instructing the child to send anything back to the parent
-#       {'name' => 'Childs %ENV', 'send' => 'all'},
-#       {'name' => 'Child chooses randomly', 'send' => 'random'},
-#       {'name' => 'Invalid send instructions', 'send' => 'Na Na Nana Na'},
-#       {'name' => 'ENV values in an array', 'send' => 'values'},
-#   ]
-# 
-#   # prep random statement components
-#   foods = ['chocolate', 'ice cream', 'peanut butter', 'pickles', 'pizza', 'bacon', 'pancakes', 'spaghetti', 'cookies']
-#   preferences = ['loves', 'can\'t stand', 'always wants more', 'will walk 100 miles for', 'only eats', 'would starve rather than eat']
-#   
-#   # run the parallel processes
-#   instructions.each {
-#       |instruction|
-#       pm.start(instruction['name']) and next # this time we are using an explicit, unique child process identifier
-# 
-#       if !instruction.has_key?("send")
-#           print "MT name #{instruction['name']}\n"
-#           pm.finish(0)
-#       end
-# 
-#       if instruction['send'] == 'keys'
-#           pm.finish(0, ENV.keys())
-#       elsif instruction['send'] == 'values'
-#           pm.finish(0, ENV.values())
-#       elsif instruction['send'] == 'all'
-#           pm.finish(0, ENV)
-#       elsif instruction['send'] == 'random'
-#           str = "I'm just a string."
-#           arr = %w{I am an array};
-#           hsh = {'type' => 'associative array', 'synonym' => 'hash', 'cool' => 'very :)'}
-#           choices = %w{str arr hsh}
-#           return_choice = choices.index(choices.sort_by{ rand }[0])
-# 
-#           if choices[return_choice] == 'str'
-#               pm.finish(0, str)
-#           elsif choices[return_choice] == 'arr'
-#               pm.finish(0, arr)
-#           elsif choices[return_choice] == 'hsh'
-#               pm.finish(0, hsh)
-#           end
-#       else
-#           pm.finish(0, "Invalid instructions: #{instruction['send']}\n")
-#       end
-#   }
-# 
-#   pm.wait_all_children
-# 
-#   # post fork processing of returned data structures
-#   retrieved_responses.keys.sort.each {
-#       |response|
-#       print "Post processing \"#{response}\"...\n"
-#   }
-#
-
 require "English"
 require "tmpdir"
 require "yaml"
 
+require_relative "forkmanager/version"
 require_relative "forkmanager/process_interface"
 require_relative "forkmanager/serializer"
+require_relative "forkmanager/dummy_process_status"
 
+##
+# This module provides a namespace.
 module Parallel
+  ##
+  # This class provides a higher level interface to +fork+, allowing you to
+  # limit the number of child processes spawned and it provides a mechanism for
+  # child processes to return data structures to the parent.
   class ForkManager
-    VERSION = "2.0.5"
-
     include Parallel::ForkManager::ProcessInterface
 
-    # new(max_procs, [params])
-    #
+    ##
     # Instantiate a Parallel::ForkManager object. You must specify the maximum
     # number of children to fork off. If you specify 0 (zero), then no children
     # will be forked.  This is intended for debugging purposes.
@@ -344,73 +40,39 @@ module Parallel
     # Parallel::ForkManager will <em>not</em> create this directory for you
     # and new() will exit!
     #
-    #
+    # @param max_procs[Integer] maximum number of concurrent child processes.
+    # @param params[Hash] configuration parameters.
     def initialize(max_procs = 0, params = {})
       check_ruby_version
-
-      @max_procs = max_procs
-      @processes = {}
-      @do_on_finish = {}
-      @in_child = false
-      @has_block = false
-      @on_wait_period = nil
-      @parent_pid = $PID
-      @waitpid_blocking_sleep = 1
-      @params = params
-      @debug = (defined? @params["debug"]) ? @params["debug"] : 0
-      @tempdir = (@params.key?("tempdir")) ? @params["tempdir"] : Dir.tmpdir
-      @auto_cleanup = (defined? @params["tempdir"]) ? 1 : 0
-      @data_structure = nil
-      @process_interface = params.fetch("process_interface", ProcessInterface::Instance.new)
-
-      # Make sure that @tempdir has a trailing slash.
-      @tempdir <<= (@tempdir[(@tempdir.length - 1)..-1] != "/") ? "/" : ""
+      setup_instance_variables(max_procs, params)
 
       # Always provide debug information if our max processes are zero!
       if @max_procs.zero?
         puts "Zero processes have been specified so we will not fork and will proceed in debug mode!"
-        @debug = 1
-      end
-
-      if @debug == 1
         puts "in initialize #{max_procs}!"
         puts "Will use tempdir #{@tempdir}"
       end
 
-      if @params.keys.length > 0
-        unless defined? @tempdir
-          puts "params missing required argument: tempdir!"
-          exit 1
-        end
-
-        unless File.directory? @tempdir
-          puts "Temporary directory #{@tempdir} doesn't exist or is not a directory."
-          exit 1
-        end
-
-        @serializer = Parallel::ForkManager::Serializer.new(
-          params["serialize_as"] || params["serialize_type"] || "marshal"
-        )
-      end
-
       # Appetite for Destruction.
-      ObjectSpace.define_finalizer(self, self.class.finalize(@parent_pid, @tempdir))
+      ObjectSpace.define_finalizer(self, self.class._finalize)
     end
 
-    def self.finalize(_the_ppid, the_dir)
+    ##
+    # This finalizer is not meant to be called manually, it cleans up temporary
+    # files which were used to return serialized data from the children.
+    def self._finalize
       proc do
-        Dir.foreach(the_dir) do |file|
-          ds_file = "Parallel-ForkManager-#{@the_ppid}-"
-          next unless /^#{ds_file}/.match(file)
-          File.unlink("#{the_dir}/#{file}")
+        Dir.foreach(tempdir) do |file_name|
+          prefix = "Parallel-ForkManager-#{parent_pid}-"
+          next unless file_name.start_with prefix
+          File.unlink("#{tempdir}/#{file_name}")
         end
       end
     end
 
+    attr_reader :max_procs
 
-    #
-    # start("string") -- "string" identification is optional.
-    #
+    ##
     # start("string") "puts the fork in Parallel::ForkManager" -- as start() does
     # the fork().  start() returns the pid of the child process for the parent,
     # and 0 for the child process.  If you set the 'processes' parameter for the
@@ -486,9 +148,7 @@ module Parallel
     #
 
     def start(identification = nil, *args, &run_block)
-      if @in_child
-        fail "Cannot start another process while you are in the child process"
-      end
+      fail AttemptedStartInChildProcessError if in_child
 
       while @max_procs.nonzero? && @processes.length >= @max_procs
         on_wait
@@ -513,7 +173,7 @@ module Parallel
         fail "Cannot fork #{$ERROR_INFO}" unless defined? pid
 
         if pid.nil?
-          @in_child = true
+          self.in_child = true
         else
           @processes[pid] = identification
           on_start(pid, identification)
@@ -588,7 +248,7 @@ module Parallel
         fail "Do not use finish(...) when using blocks.  Use an explicit exit in your block instead!\n"
       end
 
-      if @in_child
+      if in_child
         exit_code ||= 0
 
         unless data_structure.nil?
@@ -651,7 +311,7 @@ module Parallel
         id = @processes.delete(kid)
 
         # Retrieve child data structure, if any.
-        the_retr_data = {}
+        the_retr_data = nil
         the_tempfile = "#{@tempdir}Parallel-ForkManager-#{$PID}-#{kid}.txt"
 
         begin
@@ -670,7 +330,7 @@ module Parallel
         end
 
         status = child_status
-        on_finish(kid, status >> 8, id, status & 0x7f, status & 0x80 ? 1 : 0, the_retr_data)
+        on_finish(kid, status.exitstatus, id, status.stopsig, status.coredump?, the_retr_data)
         break
       end
 
@@ -715,7 +375,7 @@ module Parallel
     # Returns true if within the parent or false if within the child.
     #
     def is_parent()
-      !@in_child
+      !in_child
     end
 
     #
@@ -724,7 +384,7 @@ module Parallel
     # Returns true if within the child or false if within the parent.
     #
     def is_child()
-      @in_child
+      in_child
     end
 
     #
@@ -992,7 +652,7 @@ module Parallel
       return 1 if @serializer.nil?
 
       File.open(store_tempfile, "wb") do |f|
-        f.write(@serializer.serialize(@data_structure.to_hash))
+        f.write(@serializer.serialize(@data_structure))
       end
       return 1
 
@@ -1026,6 +686,40 @@ module Parallel
     private :_serialize_data, :_unserialize_data
 
     private
+
+    attr_reader :parent_pid
+    attr_reader :tempdir
+    attr_accessor :in_child
+
+    def setup_instance_variables(max_procs, params)
+      @max_procs = max_procs
+
+      # TODO: remove this, it seems to be unused.
+      @debug = params.fetch("debug", false)
+
+      @tempdir = params.fetch("tempdir", Dir.tmpdir)
+      @tempdir += "/" unless @tempdir.end_with?("/")
+      unless File.directory? @tempdir
+        fail(MissingTempDirError,
+             "#{@tempdir} doesn't exist or is not a directory.")
+      end
+
+      @process_interface = params.fetch("process_interface",
+                                        ProcessInterface::Instance.new)
+
+      @data_structure = nil
+      @processes = {}
+      @do_on_finish = {}
+      @in_child = false
+      @has_block = false
+      @on_wait_period = nil
+      @parent_pid = $PID
+      @waitpid_blocking_sleep = 1
+
+      @serializer = Parallel::ForkManager::Serializer.new(
+        params["serialize_as"] || params["serialize_type"] || "marshal"
+      )
+    end
 
     # We care about the Ruby version for a couple of reasons:
     #

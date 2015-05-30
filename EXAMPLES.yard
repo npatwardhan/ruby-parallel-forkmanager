@@ -1,0 +1,40 @@
+= Parallel::ForkManager Examples
+
+The programs in the examples directory show the use of the Parallel::ForkManager
+gem.
+
+To run them from this directory use a command like:
+
+    ruby -Ilib examples/data_structures_advanced.rb
+
+The programs are discussed below.
+
+== examples/callbacks.rb
+
+Example of a program using callbacks to get child exit codes.
+
+{include:file:examples/callbacks.rb}
+
+== data_structures_string.rb
+
+In this simple example, each child sends back a string.
+
+{include:file:examples/data_structures_string.rb}
+
+== data_structures_advanced.rb
+
+A second data structure retrieval example demonstrates how children
+decide whether or not to send anything back, what to send and how the
+parent should process whatever is retrieved.
+
+{include:file:examples/data_structures_advanced.rb}
+
+== parallel_http_get.rb
+
+Use multiple workers to fetch data from URLs.
+
+{include:file:examples/parallel_http_get.rb}
+
+== use_pfm.rb
+
+{include:file:examples/use_pfm.rb}

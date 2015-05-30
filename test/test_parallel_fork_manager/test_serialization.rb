@@ -5,7 +5,7 @@ require "minitest_helper"
 
 module TestParallelForkManager
   class TestSerialization < Minitest::Test
-    FINISH_DATA = { foo: "bar".freeze, baz: nil }.freeze
+    DEFAULT_RETURN = { foo: "bar".freeze, baz: nil }.freeze
 
     def test_marshal
       run_test(params: { "serialize_as" => "marshal" })
@@ -26,32 +26,34 @@ module TestParallelForkManager
     end
 
     def test_with_default_serializer
-      # It seems that the default serializer is only set up if there are other
-      # params passed into the constructor.
-      run_test(params: { "foo" => "bar" })
+      run_test
+    end
 
-      # If we run with no parmeters then the serializer isn't set up, so we get
-      # an empty hash back.
-      run_test(expected: {})
+    def test_non_hash_data_return
+      data = "This is a string"
+      run_test(params: { "serialize_as" => "yaml" },
+               return: data,
+               expected: data)
     end
 
     def run_test(args = {})
       params = args.fetch(:params, {})
-      expected = args.fetch(:expected, FINISH_DATA)
+      return_data = args.fetch(:return, DEFAULT_RETURN)
+      expected = args.fetch(:expected, DEFAULT_RETURN)
 
       pfm = Parallel::ForkManager.new(1, params)
-      returned_ds = nil
-      pfm.run_on_finish do |pid, exit_code, ident, exit_signal, core_dump, ds|
-        returned_ds = ds
+      returned_data = nil
+      pfm.run_on_finish do |_pid, _exit_code, _ident, _exit_signal, _core_dump, data|
+        returned_data = data
       end
 
       unless pfm.start
         # ... in the child ...
-        pfm.finish(0, FINISH_DATA)
+        pfm.finish(0, return_data)
       end
       pfm.wait_all_children
 
-      assert_equal expected, returned_ds
+      assert_equal expected, returned_data
     end
   end
 end
