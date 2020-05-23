@@ -605,7 +605,7 @@ module Parallel
     # It is called automatically by wait_one_child(...).
     #
     def _waitpid(_pid, flag)
-      flag ? _waitpid_non_blocking : _waitpid_blocking
+      flag != 0 ? _waitpid_non_blocking : _waitpid_blocking
     end
 
     #
