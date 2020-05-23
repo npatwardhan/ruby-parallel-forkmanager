@@ -402,7 +402,7 @@ module Parallel
 
       fail "Number processes '#{nbr}' higher than then max number of processes: #{@max_procs}" if nbr > max_procs
 
-      wait_one_child until (max_procs - running_procs) >= nbr
+      wait_one_child(0) until (max_procs - running_procs) >= nbr
     end
 
     #
