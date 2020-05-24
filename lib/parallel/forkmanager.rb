@@ -153,7 +153,10 @@ module Parallel
       while @max_procs.nonzero? && @processes.length >= @max_procs
         on_wait
         arg = (defined? @on_wait_period && !@on_wait_period.nil?) ? Process::WNOHANG : nil
-        wait_one_child(arg)
+        kid = wait_one_child(arg)
+        if kid == 0 || kid == -1
+          sleep @waitpid_blocking_sleep
+        end
       end
 
       wait_children
@@ -343,10 +346,13 @@ module Parallel
     # forked. This is a blocking wait.
     #
     def wait_all_children
-      until @processes.keys.empty?
+      until @processes.empty?
         on_wait
         arg = (defined? @on_wait_period and !@on_wait_period.nil?) ? Process::WNOHANG : nil
-        wait_one_child(arg)
+        kid = wait_one_child(arg)
+        if kid == 0 || kid == -1
+          sleep @waitpid_blocking_sleep
+        end
       end
     rescue Errno::ECHILD
       # do nothing.
@@ -396,7 +402,7 @@ module Parallel
 
       fail "Number processes '#{nbr}' higher than then max number of processes: #{@max_procs}" if nbr > max_procs
 
-      wait_one_child until (max_procs - running_procs) >= nbr
+      wait_one_child(0) until (max_procs - running_procs) >= nbr
     end
 
     #
@@ -605,7 +611,7 @@ module Parallel
     # It is called automatically by wait_one_child(...).
     #
     def _waitpid(_pid, flag)
-      flag ? _waitpid_non_blocking : _waitpid_blocking
+      flag != 0 ? _waitpid_non_blocking : _waitpid_blocking
     end
 
     #
