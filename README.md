@@ -99,7 +99,7 @@ Nathan Patwardhan <noopy.org@gmail.com>
 
 ### Copyright
 
-Copyright (c) 2008 - 2015 Nathan Patwardhan
+Copyright (c) 2008 - 2020 Nathan Patwardhan
 
 ### License
 
@@ -133,3 +133,4 @@ Parallel::ForkManager documentation by Noah Robin
 - Roger Pack <rogerdpack@gmail.com> (bugfix, fork semantics in start,
   doc changes)
 - Mike Stok <mike@stok.ca> (test cases, percussion, backing vocals)
+- Akinori MUSHA <email@redacted>
